@@ -3,6 +3,7 @@
  * they follow the panel's colors and dark mode without a custom theme.
  */
 
+.atp-hidden { display: none; }
 .atp-muted { color: var(--gray-500); }
 .atp-mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 

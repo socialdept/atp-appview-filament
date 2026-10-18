@@ -67,7 +67,7 @@ class BackfillsTest extends TestCase
 
     public function test_the_widget_shows_a_card_per_backfill(): void
     {
-        Livewire::test(BackfillsWidget::class)->assertDontSee(self::READS);
+        Livewire::test(BackfillsWidget::class)->assertDontSee(self::READS)->assertSeeHtml('atp-hidden');
 
         $this->backfill(['did:plc:a' => true, 'did:plc:b' => false]);
 
@@ -75,7 +75,8 @@ class BackfillsTest extends TestCase
             ->assertSee(self::READS)
             ->assertSee('Backfilling')
             ->assertSee('50%')
-            ->assertSee('1 of 2 repos');
+            ->assertSee('1 of 2 repos')
+            ->assertDontSeeHtml('atp-hidden');
     }
 
     public function test_a_finished_card_explains_what_is_left_and_a_failed_one_says_why(): void

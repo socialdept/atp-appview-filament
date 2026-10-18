@@ -20,6 +20,7 @@ use RyanChandler\BladeCaptureDirective\BladeCaptureDirectiveServiceProvider;
 use SocialDept\AtpAppview\AtpAppviewServiceProvider;
 use SocialDept\AtpAppviewFilament\AtpAppviewFilamentServiceProvider;
 use SocialDept\AtpAppviewFilament\Tests\Fixtures\AdminPanelProvider;
+use SocialDept\AtpSchema\SchemaServiceProvider;
 use SocialDept\AtpSupport\AtpSupportServiceProvider;
 
 abstract class TestCase extends Testbench
@@ -41,6 +42,7 @@ abstract class TestCase extends Testbench
             TablesServiceProvider::class,
             WidgetsServiceProvider::class,
             AtpSupportServiceProvider::class,
+            SchemaServiceProvider::class,
             AtpAppviewServiceProvider::class,
             AtpAppviewFilamentServiceProvider::class,
             AdminPanelProvider::class,
@@ -52,6 +54,8 @@ abstract class TestCase extends Testbench
         $app['config']->set('database.default', 'testing');
         $app['config']->set('cache.default', 'array');
         $app['config']->set('app.key', 'base64:'.base64_encode(random_bytes(32)));
+        $app['config']->set('atp-appview.ingest.admin_url', 'http://tap.test');
+        $app['config']->set('atp-appview.ingest.collections', ['app.example.post', 'app.example.like']);
     }
 
     protected function setUp(): void
