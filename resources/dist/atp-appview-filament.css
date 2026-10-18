@@ -1,0 +1,58 @@
+/*
+ * Styles for atp-appview-filament. Built on Filament's color variables, so
+ * they follow the panel's colors and dark mode without a custom theme.
+ */
+
+.atp-muted { color: var(--gray-500); }
+.atp-mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+.atp-backfills {
+    display: grid;
+    gap: 1.5rem;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 26rem), 1fr));
+}
+
+.atp-backfill-head { display: flex; align-items: center; gap: 0.75rem; }
+.atp-backfill-collection { font-size: 0.875rem; font-weight: 600; }
+.atp-backfill-when { margin-left: auto; font-size: 0.75rem; }
+
+.atp-backfill-figures {
+    display: flex;
+    align-items: baseline;
+    gap: 0.75rem;
+    margin-top: 1rem;
+    font-size: 0.875rem;
+}
+.atp-backfill-figure {
+    font-size: 1.875rem;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+}
+.atp-backfill-eta { margin-left: auto; font-variant-numeric: tabular-nums; }
+
+.atp-bar {
+    height: 0.5rem;
+    margin-top: 0.75rem;
+    border-radius: 9999px;
+    overflow: hidden;
+    background: color-mix(in oklab, var(--gray-500) 22%, transparent);
+}
+.atp-bar-fill { height: 100%; transition: width 1s ease; }
+.atp-bar-fill--running { background: var(--primary-500); }
+.atp-bar-fill--finished { background: var(--success-500); }
+.atp-bar-fill--failed { background: var(--danger-500); }
+
+.atp-backfill-error { margin-top: 0.75rem; font-size: 0.8125rem; color: var(--danger-500); }
+
+.atp-backfill-foot {
+    display: flex;
+    gap: 1rem;
+    margin-top: 1rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid color-mix(in oklab, var(--gray-500) 18%, transparent);
+    font-size: 0.75rem;
+}
+
+/* The callout sits above the page header, where the page adds no padding. */
+.atp-notice > .fi-callout { margin-top: 2rem; margin-bottom: -0.5rem; }
