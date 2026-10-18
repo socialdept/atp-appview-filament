@@ -157,6 +157,17 @@ class ResourcesTest extends TestCase
             ->assertCanSeeTableRecords(Record::query()->where('collection', self::LIKES)->get());
     }
 
+    public function test_companion_collections_can_be_browsed_too(): void
+    {
+        config(['atp-appview.ingest.companions' => ['app.example.profile']]);
+        $this->record('did:plc:alice', 'app.example.profile', 'self', ['displayName' => 'Alice']);
+
+        $page = Livewire::test(ListRecords::class);
+
+        $this->assertArrayHasKey('app.example.profile', $page->instance()->getTable()->getFilter('collection')->getOptions());
+        $page->filterTable('collection', 'app.example.profile')->assertSee('Alice');
+    }
+
     public function test_the_json_viewer_links_records_repos_blobs_and_followed_lexicons(): void
     {
         FollowedLexicon::query()->insert(['nsid' => self::POSTS, 'did' => 'did:plc:author', 'uri' => 'at://did:plc:author/com.atproto.lexicon.schema/'.self::POSTS, 'schema' => '{}', 'revision' => 1, 'fetched_at' => now()]);

@@ -13,6 +13,7 @@ use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use SocialDept\AtpAppview\Ingest\Collections;
 use SocialDept\AtpAppview\Models\Record;
 use SocialDept\AtpAppviewFilament\Resources\Concerns\InPluginNavigationGroup;
 use SocialDept\AtpAppviewFilament\Resources\Identities\IdentityResource;
@@ -47,7 +48,8 @@ class RecordResource extends Resource
 
     public static function table(Table $table): Table
     {
-        $collections = array_values(array_unique((array) config('atp-appview.ingest.collections', [])));
+        // Followed and companion collections alike, such as profiles.
+        $collections = Collections::all();
         $collections = array_combine($collections, $collections);
 
         return $table
