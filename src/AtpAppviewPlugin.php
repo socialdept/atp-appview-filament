@@ -2,10 +2,15 @@
 
 namespace SocialDept\AtpAppviewFilament;
 
+use Closure;
 use Filament\Contracts\Plugin;
 use Filament\Panel;
 use Filament\View\PanelsRenderHook;
 use Illuminate\Support\Facades\Blade;
+use SocialDept\AtpAppviewFilament\Resources\Blocks\BlockResource;
+use SocialDept\AtpAppviewFilament\Resources\Identities\IdentityResource;
+use SocialDept\AtpAppviewFilament\Resources\Lexicons\LexiconResource;
+use SocialDept\AtpAppviewFilament\Resources\Records\RecordResource;
 use SocialDept\AtpAppviewFilament\Widgets\BackfillsWidget;
 use SocialDept\AtpAppviewFilament\Widgets\CollectionsTable;
 use SocialDept\AtpAppviewFilament\Widgets\IndexOverview;
@@ -24,6 +29,17 @@ class AtpAppviewPlugin implements Plugin
     protected bool $dashboardWidgets = true;
 
     protected bool $backfillNotice = true;
+
+    protected bool $identities = true;
+
+    protected bool $records = true;
+
+    protected bool $lexicons = true;
+
+    protected bool $blocklist = true;
+
+    /** @var (Closure(string): string)|null */
+    protected ?Closure $recordLinks = null;
 
     public static function make(): static
     {
@@ -88,8 +104,78 @@ class AtpAppviewPlugin implements Plugin
         return $this->backfillNotice;
     }
 
+    /**
+     * The Identities page: every repo the index knows, its account status and
+     * what the reconciler last found.
+     */
+    public function identities(bool $condition = true): static
+    {
+        $this->identities = $condition;
+
+        return $this;
+    }
+
+    /**
+     * The Records page: the index a collection at a time.
+     */
+    public function records(bool $condition = true): static
+    {
+        $this->records = $condition;
+
+        return $this;
+    }
+
+    /**
+     * The Lexicons page: followed lexicons and versions held back.
+     */
+    public function lexicons(bool $condition = true): static
+    {
+        $this->lexicons = $condition;
+
+        return $this;
+    }
+
+    /**
+     * The Blocklist page: repos and hosts kept out of the index.
+     */
+    public function blocklist(bool $condition = true): static
+    {
+        $this->blocklist = $condition;
+
+        return $this;
+    }
+
+    public function hasRecords(): bool
+    {
+        return $this->records;
+    }
+
+    /**
+     * Where AT-URIs and DIDs link, given an AT-URI. pds.ls by default.
+     *
+     * @param  Closure(string $uri): string  $url
+     */
+    public function recordLinks(Closure $url): static
+    {
+        $this->recordLinks = $url;
+
+        return $this;
+    }
+
+    public function recordUrl(string $uri): string
+    {
+        return $this->recordLinks === null ? 'https://pds.ls/'.$uri : (string) ($this->recordLinks)($uri);
+    }
+
     public function register(Panel $panel): void
     {
+        $panel->resources(array_keys(array_filter([
+            IdentityResource::class => $this->identities,
+            RecordResource::class => $this->records,
+            LexiconResource::class => $this->lexicons,
+            BlockResource::class => $this->blocklist,
+        ])));
+
         if ($this->dashboardWidgets) {
             $panel->widgets([
                 BackfillsWidget::class,

@@ -52,9 +52,15 @@ Who can reach the panel is up to the panel, through `canAccessPanel()` on the us
 ## What it adds
 
 - **Network, Index and Upkeep stats** on the dashboard, from atp-appview's `AppviewStatus`: whether Tap is up and how far behind the index is, what the index holds, and how reconciliation, followed lexicons and the blocklist are doing. Each stat's second line adds a figure rather than restating the label.
-- **A Collections table**: records, repos, hidden records and tombstones per collection, as `appview:stats` last counted them, with a button to count again.
+- **A Collections table**: records, repos, hidden records and tombstones per collection, as `appview:stats` last counted them, with a button to count again. Each record count opens that collection on the Records page.
 - **Backfill cards** on the dashboard: one per running backfill, and per one that ended in the last hour, with how many repos have delivered, records received, the rate, the time left, and why one failed.
 - **A backfill notice** at the top of every other page while a backfill runs, since lists and counts may be missing records until it finishes.
+- **Identities**: every repo the index knows, with its handle, PDS, account status, record count and what the reconciler last found, errors grouped by kind. Reconcile one repo or a selection now.
+- **Records**: the index a collection at a time, filtered by repo, tombstones or hidden records, with each record in a JSON viewer.
+- **Lexicons**: followed lexicons, the revision in use and any new version held back, with its breaking changes listed and a button to accept it anyway. Check for new versions from the page.
+- **Blocklist**: block a repo by DID or every repo on a PDS host, optionally deleting what is already indexed, purge and unblock.
+
+The JSON viewer highlights the value and links what can be followed: AT-URIs and DIDs, web URLs, blobs on the repo's PDS, and a `$type` naming a followed lexicon.
 
 ## Options
 
@@ -63,7 +69,12 @@ AtpAppviewPlugin::make()
     ->navigationGroup('AppView')   // or null for none
     ->dashboardWidgets(false)      // place the widgets yourself
     ->backfillNotice(false)        // no notice on every page
+    ->identities(false)            // leave out a page: also records(),
+                                   // lexicons() and blocklist()
+    ->recordLinks(fn (string $uri) => "https://pdsls.dev/{$uri}")
 ```
+
+AT-URIs and DIDs link to [pds.ls](https://pds.ls) unless `recordLinks()` says otherwise. The pages sit under `/appview/` in the panel's URL space.
 
 The plugin's styles are built on Filament's color variables, so they follow the panel's colors and dark mode without a custom theme.
 

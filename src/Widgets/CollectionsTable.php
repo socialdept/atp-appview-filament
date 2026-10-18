@@ -9,7 +9,10 @@ use Filament\Tables\Table;
 use Filament\Widgets\TableWidget;
 use SocialDept\AtpAppview\Index\IndexStats;
 use SocialDept\AtpAppview\Status\AppviewStatus;
+use SocialDept\AtpAppviewFilament\AtpAppviewPlugin;
+use SocialDept\AtpAppviewFilament\Resources\Records\RecordResource;
 use SocialDept\AtpAppviewFilament\Support\Durations;
+use Throwable;
 
 /**
  * Records per collection, as appview:stats last counted them.
@@ -28,7 +31,10 @@ class CollectionsTable extends TableWidget
             ->records(fn () => collect(app(AppviewStatus::class)->collections())->keyBy('nsid')->all())
             ->columns([
                 TextColumn::make('nsid')->label('Collection')->fontFamily('mono'),
-                TextColumn::make('records')->numeric()->alignEnd(),
+                TextColumn::make('records')
+                    ->numeric()
+                    ->alignEnd()
+                    ->url(fn (array $record) => self::recordsUrl($record['nsid'])),
                 TextColumn::make('repos')->numeric()->alignEnd(),
                 TextColumn::make('hidden')->numeric()->alignEnd()->color('gray'),
                 TextColumn::make('tombstones')->numeric()->alignEnd()->color('gray'),
@@ -46,5 +52,19 @@ class CollectionsTable extends TableWidget
                     }),
             ])
             ->paginated(false);
+    }
+
+    /**
+     * The Records page showing a collection, when the plugin has one.
+     */
+    protected static function recordsUrl(string $nsid): ?string
+    {
+        try {
+            return AtpAppviewPlugin::get()->hasRecords()
+                ? RecordResource::getUrl('index', ['filters' => ['collection' => ['value' => $nsid]]])
+                : null;
+        } catch (Throwable) {
+            return null;
+        }
     }
 }
