@@ -56,7 +56,7 @@ Who can reach the panel is up to the panel, through `canAccessPanel()` on the us
 - **Backfill cards** on the dashboard: one per running backfill, and per one that ended in the last hour, with how many repos have delivered, records received, the rate, the time left, and why one failed.
 - **A backfill notice** at the top of every other page while a backfill runs, since lists and counts may be missing records until it finishes.
 - **Identities**: every repo the index knows, with its handle, PDS, account status, record count and what the reconciler last found, errors grouped by kind. Reconcile one repo or a selection now.
-- **Records**: the index a collection at a time, filtered by repo, tombstones or hidden records, with each record in a JSON viewer.
+- **Records**: the index a collection at a time, companion collections such as profiles included, filtered by repo, tombstones or hidden records, with each record in a JSON viewer.
 - **Lexicons**: followed lexicons, the revision in use and any new version held back, with its breaking changes listed and a button to accept it anyway. Check for new versions from the page.
 - **Blocklist**: block a repo by DID or every repo on a PDS host, optionally deleting what is already indexed, purge and unblock.
 
