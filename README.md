@@ -27,6 +27,44 @@ An operator panel for an AppView built on [atp-appview](https://github.com/socia
 - Filament 5
 - atp-appview
 
+## Installation
+
+```bash
+composer require socialdept/atp-appview-filament
+php artisan filament:assets
+```
+
+Add the plugin to a panel:
+
+```php
+use SocialDept\AtpAppviewFilament\AtpAppviewPlugin;
+
+public function panel(Panel $panel): Panel
+{
+    return $panel
+        // ...
+        ->plugin(AtpAppviewPlugin::make());
+}
+```
+
+Who can reach the panel is up to the panel, through `canAccessPanel()` on the user model as usual.
+
+## What it adds
+
+- **Backfill cards** on the dashboard: one per running backfill, and per one that ended in the last hour, with how many repos have delivered, records received, the rate, the time left, and why one failed.
+- **A backfill notice** at the top of every other page while a backfill runs, since lists and counts may be missing records until it finishes.
+
+## Options
+
+```php
+AtpAppviewPlugin::make()
+    ->navigationGroup('AppView')   // or null for none
+    ->dashboardWidgets(false)      // place the widgets yourself
+    ->backfillNotice(false)        // no notice on every page
+```
+
+The plugin's styles are built on Filament's color variables, so they follow the panel's colors and dark mode without a custom theme.
+
 ## License
 
 MIT
