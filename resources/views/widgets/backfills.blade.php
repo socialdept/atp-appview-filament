@@ -2,8 +2,9 @@
     use SocialDept\AtpAppviewFilament\Support\Durations;
 @endphp
 
-{{-- The widget is the root, so the dashboard grid gives it its column span. --}}
-<x-filament-widgets::widget wire:poll.5s class="atp-backfills-widget">
+{{-- The widget is the root, so the dashboard grid gives it its column span.
+     Hidden while empty, so it leaves no gap, but still polling. --}}
+<x-filament-widgets::widget wire:poll.5s @class(['atp-backfills-widget', 'atp-hidden' => $backfills === []])>
     @if ($backfills !== [])
         <div class="atp-backfills">
             @foreach ($backfills as $b)

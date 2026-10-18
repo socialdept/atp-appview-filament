@@ -7,6 +7,10 @@ use Filament\Panel;
 use Filament\View\PanelsRenderHook;
 use Illuminate\Support\Facades\Blade;
 use SocialDept\AtpAppviewFilament\Widgets\BackfillsWidget;
+use SocialDept\AtpAppviewFilament\Widgets\CollectionsTable;
+use SocialDept\AtpAppviewFilament\Widgets\IndexOverview;
+use SocialDept\AtpAppviewFilament\Widgets\NetworkOverview;
+use SocialDept\AtpAppviewFilament\Widgets\UpkeepOverview;
 
 /**
  * The AppView operator panel, added to a Filament panel:
@@ -87,7 +91,13 @@ class AtpAppviewPlugin implements Plugin
     public function register(Panel $panel): void
     {
         if ($this->dashboardWidgets) {
-            $panel->widgets([BackfillsWidget::class]);
+            $panel->widgets([
+                BackfillsWidget::class,
+                NetworkOverview::class,
+                IndexOverview::class,
+                UpkeepOverview::class,
+                CollectionsTable::class,
+            ]);
         }
 
         if ($this->backfillNotice) {

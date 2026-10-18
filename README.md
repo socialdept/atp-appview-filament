@@ -51,6 +51,8 @@ Who can reach the panel is up to the panel, through `canAccessPanel()` on the us
 
 ## What it adds
 
+- **Network, Index and Upkeep stats** on the dashboard, from atp-appview's `AppviewStatus`: whether Tap is up and how far behind the index is, what the index holds, and how reconciliation, followed lexicons and the blocklist are doing. Each stat's second line adds a figure rather than restating the label.
+- **A Collections table**: records, repos, hidden records and tombstones per collection, as `appview:stats` last counted them, with a button to count again.
 - **Backfill cards** on the dashboard: one per running backfill, and per one that ended in the last hour, with how many repos have delivered, records received, the rate, the time left, and why one failed.
 - **A backfill notice** at the top of every other page while a backfill runs, since lists and counts may be missing records until it finishes.
 
