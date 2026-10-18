@@ -81,6 +81,44 @@ class ResourcesTest extends TestCase
             ->assertCanNotSeeTableRecords([Identity::query()->find('did:plc:alice')]);
     }
 
+    public function test_identities_count_records_for_the_page_shown_not_every_row_the_offset_skips(): void
+    {
+        foreach (range(1, 25) as $n) {
+            $did = sprintf('did:plc:repo%03d', $n);
+            $this->identity($did, ['handle' => "repo{$n}.test"]);
+
+            for ($r = 1; $r <= $n % 3; $r++) {
+                $this->record($did, self::POSTS, "{$n}-{$r}");
+            }
+        }
+
+        $page = Livewire::test(ListIdentities::class);
+
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+        $page->call('gotoPage', 3);
+        $queries = array_column(DB::getQueryLog(), 'query');
+        DB::disableQueryLog();
+
+        $listing = collect($queries)->first(fn (string $sql) => str_contains($sql, 'from "atp_identities"') && str_contains($sql, 'offset'));
+        $this->assertNotNull($listing);
+        $this->assertStringNotContainsString('records_count', $listing);
+        $page->assertCanSeeTableRecords(Identity::query()->whereIn('did', ['did:plc:repo021', 'did:plc:repo025'])->get());
+    }
+
+    public function test_records_list_without_counting_the_whole_collection(): void
+    {
+        $this->record('did:plc:alice', self::POSTS, 'a');
+
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+        Livewire::test(ListRecords::class);
+        $queries = array_column(DB::getQueryLog(), 'query');
+        DB::disableQueryLog();
+
+        $this->assertEmpty(array_filter($queries, fn (string $sql) => str_contains($sql, 'count(*)') && str_contains($sql, 'atp_records')));
+    }
+
     public function test_reconcile_now_records_the_outcome_through_the_reconciler(): void
     {
         $identity = $this->identity('did:plc:alice', ['handle' => 'alice.test']);
