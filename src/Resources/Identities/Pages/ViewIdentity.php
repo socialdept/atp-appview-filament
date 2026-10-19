@@ -4,6 +4,7 @@ namespace SocialDept\AtpAppviewFilament\Resources\Identities\Pages;
 
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
+use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
@@ -13,10 +14,18 @@ use Filament\Schemas\Components\Livewire;
 use Filament\Schemas\Components\View;
 use Filament\Schemas\Schema;
 use Illuminate\Contracts\Support\Htmlable;
+use Illuminate\Support\HtmlString;
 use SocialDept\AtpAppview\Blocklist\Blocklist;
+use SocialDept\AtpAppview\Index\IdentityRefresh;
+use SocialDept\AtpAppview\Index\Reconciler;
+use SocialDept\AtpAppview\Index\ReconcileResult;
+use SocialDept\AtpAppview\Ingest\TapAdmin;
+use SocialDept\AtpAppview\Ingest\TapFeatureUnavailableException;
 use SocialDept\AtpAppview\Models\Block;
+use SocialDept\AtpAppview\Models\FailedDelivery;
 use SocialDept\AtpAppview\Models\Identity;
 use SocialDept\AtpAppviewFilament\Resources\Blocks\BlockResource;
+use SocialDept\AtpAppviewFilament\Resources\FailedDeliveries\FailedDeliveryResource;
 use SocialDept\AtpAppviewFilament\Resources\Identities\IdentityResource;
 use SocialDept\AtpAppviewFilament\Resources\Records\RecordResource;
 use SocialDept\AtpAppviewFilament\Support\IdentityProfile;
@@ -66,6 +75,75 @@ class ViewIdentity extends ViewRecord
         ];
     }
 
+    /** @var array{result: ReconcileResult|null, error: string|null}|null */
+    protected ?array $preview = null;
+
+    protected ?int $failures = null;
+
+    /**
+     * What reconciling would change, read once per request.
+     *
+     * @return array{result: ReconcileResult|null, error: string|null}
+     */
+    protected function reconcilePreview(): array
+    {
+        if ($this->preview !== null) {
+            return $this->preview;
+        }
+
+        try {
+            return $this->preview = ['result' => app(Reconciler::class)->reconcile($this->record->did, dryRun: true), 'error' => null];
+        } catch (Throwable $e) {
+            return $this->preview = ['result' => null, 'error' => $e->getMessage()];
+        }
+    }
+
+    protected function failures(): int
+    {
+        return $this->failures ??= FailedDelivery::query()->where('did', $this->record->did)->count();
+    }
+
+    protected function refreshIdentity(): void
+    {
+        try {
+            $result = app(IdentityRefresh::class)->refresh($this->record->did);
+        } catch (Throwable $e) {
+            Notification::make()->title('Could not read the DID document')->body($e->getMessage())->danger()->send();
+
+            return;
+        }
+
+        $changes = collect($result['changed'])->map(fn (array $change, string $field) => "{$field}: ".($change[0] ?? 'none').' to '.($change[1] ?? 'none'))->implode(', ');
+
+        Notification::make()
+            ->title('Identity refreshed')
+            ->body($changes !== '' ? $changes : 'Handle and PDS unchanged. The cached profile was dropped.')
+            ->success()
+            ->send();
+
+        $this->record->refresh();
+        $this->profile = null;
+    }
+
+    protected function resync(): void
+    {
+        try {
+            $state = app(TapAdmin::class)->resyncRepo($this->record->did);
+        } catch (TapFeatureUnavailableException) {
+            Notification::make()->title('This Tap cannot resync')->body('Resyncing needs a Tap with POST /resync/:did, such as Tab.')->warning()->send();
+
+            return;
+        } catch (Throwable $e) {
+            Notification::make()->title('Tap did not answer')->body($e->getMessage())->danger()->send();
+
+            return;
+        }
+
+        $state === null
+            ? Notification::make()->title('Tap does not track this repo')->warning()->send()
+            : Notification::make()->title('Resync queued')->body("Tap reports the repo as {$state}.")->success()->send();
+    }
+
     protected function profile(): IdentityProfile
     {
         return $this->profile ??= IdentityProfile::for($this->record);
@@ -82,10 +160,17 @@ class ViewIdentity extends ViewRecord
     protected function getHeaderActions(): array
     {
         return [
+            // A dry run first, so tombstoning is never a surprise. Applying
+            // reconciles again, since the repo may have changed meanwhile.
             Action::make('reconcile')
                 ->label('Reconcile')
                 ->icon('heroicon-o-arrow-path')
                 ->color('gray')
+                ->modalHeading('Reconcile with its PDS')
+                ->modalWidth('2xl')
+                ->modalContent(fn () => view('atp-appview-filament::identity.reconcile-preview', $this->reconcilePreview()))
+                ->modalSubmitActionLabel('Apply')
+                ->modalSubmitAction(fn (Action $action) => ($this->reconcilePreview()['result']?->changed() || $this->reconcilePreview()['result']?->account !== null) ? $action : false)
                 ->action(function () {
                     IdentityResource::reconcile($this->record->did);
                     $this->record->refresh();
@@ -139,8 +224,51 @@ class ViewIdentity extends ViewRecord
                         : Notification::make()->title('Already unblocked')->send();
                     $this->profile = null;
                 }),
-            // Links and read-only views, out of the way of what changes things.
+            Action::make('failures')
+                ->label(fn () => 'Retry failures ('.number_format($this->failures()).')')
+                ->icon('heroicon-o-exclamation-triangle')
+                ->color('warning')
+                ->outlined()
+                ->visible(fn () => $this->failures() > 0)
+                ->modalHeading('Retry failed deliveries')
+                ->modalDescription(fn () => 'Events from this repo that ingest parked. Retry runs them as they were delivered, reindex fetches each record from the PDS as it is now.')
+                ->modalWidth('lg')
+                ->schema([
+                    Radio::make('how')
+                        ->options(['retry' => 'Retry as delivered', 'reindex' => 'Reindex from the PDS'])
+                        ->default('retry')
+                        ->required(),
+                ])
+                ->action(function (array $data) {
+                    FailedDeliveryResource::report($data['how'], FailedDelivery::query()->where('did', $this->record->did)->orderBy('id')->get()->all());
+                    $this->failures = null;
+                }),
+            // Lookups first, then links, out of the way of what changes things.
             ActionGroup::make([
+                ActionGroup::make([
+                Action::make('refresh')
+                    ->label('Refresh identity')
+                    ->icon('heroicon-o-identification')
+                    ->action(fn () => $this->refreshIdentity()),
+                Action::make('resync')
+                    ->label('Resync in Tap')
+                    ->icon('heroicon-o-arrow-down-tray')
+                    ->requiresConfirmation()
+                    ->modalDescription('Ask Tap to walk the repo again and send any record it never delivered. Records already indexed are kept, and live events for this repo wait until the resync finishes.')
+                    ->action(fn () => $this->resync()),
+                Action::make('tap')
+                    ->label('Tap status')
+                    ->icon('heroicon-o-signal')
+                    ->modalHeading('Tap status')
+                    ->modalWidth('2xl')
+                    ->modalContent(function () {
+                        try {
+                            return Json::render(app(TapAdmin::class)->info($this->record->did));
+                        } catch (Throwable $e) {
+                            return new HtmlString('<p class="atp-reconcile-error">'.e('Tap did not answer: '.$e->getMessage()).'</p>');
+                        }
+                    })
+                    ->modalSubmitAction(false),
                 Action::make('profile')
                     ->label('Profile record')
                     ->icon('heroicon-o-code-bracket')
@@ -148,6 +276,8 @@ class ViewIdentity extends ViewRecord
                     ->modalWidth('4xl')
                     ->modalContent(fn () => Json::render($this->profile()->profile, $this->record->did, $this->record->pds))
                     ->modalSubmitAction(false),
+                ])->dropdown(false),
+                ActionGroup::make([
                 Action::make('records')
                     ->label('Open in Records')
                     ->icon('heroicon-o-document-text')
@@ -172,6 +302,7 @@ class ViewIdentity extends ViewRecord
                     ->icon('heroicon-o-finger-print')
                     ->visible(fn () => str_starts_with($this->record->did, 'did:plc:'))
                     ->url(fn () => 'https://plc.directory/'.$this->record->did.'/log/audit', shouldOpenInNewTab: true),
+                ])->dropdown(false),
             ])
                 ->label('More')
                 ->icon('heroicon-m-ellipsis-horizontal')

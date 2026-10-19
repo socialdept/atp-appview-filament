@@ -151,3 +151,9 @@
     cursor: pointer;
 }
 .atp-profile-collection:hover { background: color-mix(in oklab, var(--gray-500) 22%, transparent); }
+
+.atp-reconcile { font-size: 0.875rem; display: grid; gap: 0.75rem; }
+.atp-reconcile-error { color: var(--danger-600); }
+.atp-reconcile-heading { font-weight: 600; margin-top: 0.25rem; }
+.atp-reconcile-list { display: grid; gap: 0.25rem; font-size: 0.75rem; overflow-wrap: anywhere; }
+.atp-reconcile-list a:hover { text-decoration: underline; }
