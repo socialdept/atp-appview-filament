@@ -9,13 +9,21 @@ use Mockery;
 use RuntimeException;
 use SocialDept\AtpAppview\Index\Reconciler;
 use SocialDept\AtpAppview\Index\ReconcileResult;
+use SocialDept\AtpAppview\Ingest\Events\RecordAction;
+use SocialDept\AtpAppview\Ingest\Events\RecordEvent;
+use SocialDept\AtpAppview\Ingest\FailedDeliveries;
+use SocialDept\AtpAppview\Ingest\Rejections;
+use SocialDept\AtpAppview\Ingest\Repairs;
 use SocialDept\AtpAppview\Models\Block;
+use SocialDept\AtpAppview\Models\FailedDelivery;
 use SocialDept\AtpAppview\Models\FollowedLexicon;
 use SocialDept\AtpAppview\Models\Identity;
 use SocialDept\AtpAppview\Models\Record;
 use SocialDept\AtpAppviewFilament\AtpAppviewPlugin;
 use SocialDept\AtpAppviewFilament\Resources\Blocks\BlockResource;
 use SocialDept\AtpAppviewFilament\Resources\Blocks\Pages\ListBlocks;
+use SocialDept\AtpAppviewFilament\Resources\FailedDeliveries\FailedDeliveryResource;
+use SocialDept\AtpAppviewFilament\Resources\FailedDeliveries\Pages\ListFailedDeliveries;
 use SocialDept\AtpAppviewFilament\Resources\Identities\IdentityResource;
 use SocialDept\AtpAppviewFilament\Resources\Identities\Pages\ListIdentities;
 use SocialDept\AtpAppviewFilament\Resources\Lexicons\LexiconResource;
@@ -25,6 +33,7 @@ use SocialDept\AtpAppviewFilament\Resources\Records\RecordResource;
 use SocialDept\AtpAppviewFilament\Support\Json;
 use SocialDept\AtpAppviewFilament\Tests\TestCase;
 use SocialDept\AtpAppviewFilament\Widgets\CollectionsTable;
+use SocialDept\AtpAppviewFilament\Widgets\IngestTallies;
 
 class ResourcesTest extends TestCase
 {
@@ -49,7 +58,7 @@ class ResourcesTest extends TestCase
     public function test_the_plugin_registers_every_resource_in_its_navigation_group(): void
     {
         $this->assertEqualsCanonicalizing(
-            [IdentityResource::class, RecordResource::class, LexiconResource::class, BlockResource::class],
+            [IdentityResource::class, RecordResource::class, LexiconResource::class, BlockResource::class, FailedDeliveryResource::class],
             Filament::getPanel('admin')->getResources(),
         );
         $this->assertSame('AppView', IdentityResource::getNavigationGroup());
@@ -60,7 +69,7 @@ class ResourcesTest extends TestCase
         $panel = Filament::getPanel('admin');
         $before = $panel->getResources();
 
-        AtpAppviewPlugin::make()->identities(false)->records(false)->lexicons(false)->blocklist(false)->dashboardWidgets(false)->backfillNotice(false)->register($panel);
+        AtpAppviewPlugin::make()->identities(false)->records(false)->lexicons(false)->blocklist(false)->failedDeliveries(false)->dashboardWidgets(false)->backfillNotice(false)->register($panel);
 
         $this->assertSame($before, $panel->getResources(), 'Leaving every resource out adds none.');
         $this->assertFalse(AtpAppviewPlugin::make()->records(false)->hasRecords());
@@ -217,6 +226,68 @@ class ResourcesTest extends TestCase
             ->assertNotified();
 
         $this->assertSame('did:plc:spam', Block::query()->sole()->subject);
+    }
+
+    protected function failedDelivery(string $kind = 'record', string $rkey = 'bad'): FailedDelivery
+    {
+        return FailedDelivery::query()->create([
+            'kind' => $kind, 'did' => 'did:plc:alice',
+            'collection' => $kind === 'record' ? self::POSTS : null,
+            'uri' => $kind === 'record' ? 'at://did:plc:alice/'.self::POSTS.'/'.$rkey : null,
+            'payload' => ['id' => 1, 'did' => 'did:plc:alice', 'rkey' => $rkey], 'error_class' => RuntimeException::class,
+            'error' => 'Picky refuses '.$rkey, 'failed_at' => now(),
+        ]);
+    }
+
+    public function test_failed_deliveries_list_their_errors_and_count_in_the_navigation(): void
+    {
+        $this->assertNull(FailedDeliveryResource::getNavigationBadge(), 'No badge while there are none.');
+        $record = $this->failedDelivery();
+        $identity = $this->failedDelivery('identity');
+
+        Livewire::test(ListFailedDeliveries::class)
+            ->assertCanSeeTableRecords([$record, $identity])
+            ->assertSee('Picky refuses bad')
+            ->assertSee('RuntimeException')
+            ->assertTableActionVisible('reindex', $record)
+            ->assertTableActionHidden('reindex', $identity)
+            ->filterTable('kind', 'identity')
+            ->assertCanNotSeeTableRecords([$record]);
+
+        $this->assertSame('2', FailedDeliveryResource::getNavigationBadge());
+    }
+
+    public function test_failed_deliveries_are_retried_reindexed_and_forgotten(): void
+    {
+        [$first, $second, $identity] = [$this->failedDelivery(rkey: 'a'), $this->failedDelivery(rkey: 'b'), $this->failedDelivery('identity')];
+        $service = Mockery::mock(FailedDeliveries::class);
+        $service->shouldReceive('retry')->once()->withArgs(fn ($delivery) => $delivery->is($first))->andReturn(true);
+        $service->shouldReceive('reindex')->once()->withArgs(fn ($delivery) => $delivery->is($second))->andReturn(false);
+        $this->app->instance(FailedDeliveries::class, $service);
+
+        Livewire::test(ListFailedDeliveries::class)
+            ->callTableAction('retry', $first)
+            ->assertNotified('1 went through')
+            // The identity event is skipped: it has no record to fetch.
+            ->callTableBulkAction('reindex', [$second, $identity])
+            ->assertNotified('0 went through')
+            ->callTableAction('forget', $identity);
+
+        $this->assertNull($identity->fresh());
+    }
+
+    public function test_rejections_and_repairs_are_tallied_under_the_failed_deliveries(): void
+    {
+        $event = new RecordEvent(1, 'did:plc:alice', self::POSTS, 'a', RecordAction::Create, 'cid', '3l2aaaaaaaaaa', ['text' => 'a'], true);
+        app(Rejections::class)->record('App\\Hooks\\RejectSpam', $event, 'looks like spam');
+        app(Repairs::class)->record('App\\Repairs\\SlashDates', $event, 3);
+
+        Livewire::test(IngestTallies::class)
+            ->assertSee('RejectSpam')
+            ->assertSee('looks like spam')
+            ->assertSee('SlashDates')
+            ->assertSee('repaired')
+            ->assertSee('3');
     }
 
     public function test_collection_counts_link_to_their_records(): void

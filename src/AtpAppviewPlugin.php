@@ -8,6 +8,7 @@ use Filament\Panel;
 use Filament\View\PanelsRenderHook;
 use Illuminate\Support\Facades\Blade;
 use SocialDept\AtpAppviewFilament\Resources\Blocks\BlockResource;
+use SocialDept\AtpAppviewFilament\Resources\FailedDeliveries\FailedDeliveryResource;
 use SocialDept\AtpAppviewFilament\Resources\Identities\IdentityResource;
 use SocialDept\AtpAppviewFilament\Resources\Lexicons\LexiconResource;
 use SocialDept\AtpAppviewFilament\Resources\Records\RecordResource;
@@ -37,6 +38,8 @@ class AtpAppviewPlugin implements Plugin
     protected bool $lexicons = true;
 
     protected bool $blocklist = true;
+
+    protected bool $failedDeliveries = true;
 
     /** @var (Closure(string): string)|null */
     protected ?Closure $recordLinks = null;
@@ -145,6 +148,17 @@ class AtpAppviewPlugin implements Plugin
         return $this;
     }
 
+    /**
+     * The Failed Deliveries page: events ingest parked, to retry, reindex or
+     * forget, and what hooks rejected and repairs rewrote.
+     */
+    public function failedDeliveries(bool $condition = true): static
+    {
+        $this->failedDeliveries = $condition;
+
+        return $this;
+    }
+
     public function hasRecords(): bool
     {
         return $this->records;
@@ -174,6 +188,7 @@ class AtpAppviewPlugin implements Plugin
             RecordResource::class => $this->records,
             LexiconResource::class => $this->lexicons,
             BlockResource::class => $this->blocklist,
+            FailedDeliveryResource::class => $this->failedDeliveries,
         ])));
 
         if ($this->dashboardWidgets) {

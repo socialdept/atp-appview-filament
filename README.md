@@ -59,6 +59,7 @@ Who can reach the panel is up to the panel, through `canAccessPanel()` on the us
 - **Records**: the index a collection at a time, companion collections such as profiles included, filtered by repo, tombstones or hidden records, with each record in a JSON viewer.
 - **Lexicons**: followed lexicons, the revision in use and any new version held back, with its breaking changes listed and a button to accept it anyway. Check for new versions from the page.
 - **Blocklist**: block a repo by DID or every repo on a PDS host, optionally deleting what is already indexed, purge and unblock.
+- **Failed Deliveries**: events ingest parked because no handler could take them, with the error and the event in the JSON viewer. Retry once the cause in the app is fixed, reindex from the record's PDS once the record is, or forget them, one at a time or a selection. The navigation shows how many are parked. Below them, what ingest hooks rejected and ingest repairs rewrote, by class and collection.
 
 The JSON viewer highlights the value and links what can be followed: AT-URIs and DIDs, web URLs, blobs on the repo's PDS, and a `$type` naming a followed lexicon.
 
@@ -70,7 +71,8 @@ AtpAppviewPlugin::make()
     ->dashboardWidgets(false)      // place the widgets yourself
     ->backfillNotice(false)        // no notice on every page
     ->identities(false)            // leave out a page: also records(),
-                                   // lexicons() and blocklist()
+                                   // lexicons(), blocklist() and
+                                   // failedDeliveries()
     ->recordLinks(fn (string $uri) => "https://pdsls.dev/{$uri}")
 ```
 
