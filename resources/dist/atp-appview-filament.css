@@ -94,3 +94,60 @@
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
     font-size: 0.75rem;
 }
+
+/* Identity page: laid out as a social profile. */
+.atp-profile {
+    overflow: hidden;
+    border-radius: 0.75rem;
+    background: var(--color-white, #fff);
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.05);
+    outline: 1px solid color-mix(in oklab, var(--gray-950) 5%, transparent);
+}
+.dark .atp-profile {
+    background: color-mix(in oklab, var(--gray-900) 100%, transparent);
+    outline-color: color-mix(in oklab, #fff 10%, transparent);
+}
+.atp-profile-banner {
+    aspect-ratio: 3 / 1;
+    max-height: 16rem;
+    width: 100%;
+    background: linear-gradient(135deg, var(--primary-400), var(--primary-700)) center / cover no-repeat;
+}
+.atp-profile-banner[style] { background-size: cover; background-position: center; }
+.atp-profile-body { padding: 0 1.5rem 1.5rem; }
+.atp-profile-avatar {
+    width: 6rem;
+    height: 6rem;
+    margin-top: -3rem;
+    border-radius: 9999px;
+    object-fit: cover;
+    border: 4px solid var(--color-white, #fff);
+    background: var(--gray-200);
+    position: relative;
+}
+.dark .atp-profile-avatar { border-color: var(--gray-900); background: var(--gray-800); }
+.atp-profile-name { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.75rem; }
+.atp-profile-name h2 { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.01em; line-height: 1.2; }
+.atp-profile-handle { margin-top: 0.125rem; font-size: 0.9375rem; display: flex; gap: 0.375rem; }
+.atp-profile-handle a:hover, .atp-profile-meta a:hover { text-decoration: underline; }
+.atp-profile-bio { margin-top: 0.875rem; font-size: 0.9375rem; line-height: 1.5; max-width: 42rem; overflow-wrap: anywhere; }
+.atp-profile-bio a { color: var(--primary-600); }
+.dark .atp-profile-bio a { color: var(--primary-400); }
+.atp-profile-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1.25rem; margin-top: 0.875rem; font-size: 0.875rem; }
+.atp-profile-meta > * { display: inline-flex; align-items: center; gap: 0.25rem; }
+.atp-profile-icon { width: 1rem; height: 1rem; }
+.atp-profile-did { font-size: 0.75rem; }
+.atp-profile-stats { display: flex; flex-wrap: wrap; gap: 0.5rem 1.25rem; margin-top: 0.875rem; font-size: 0.875rem; color: var(--gray-500); }
+.atp-profile-stats strong { color: var(--gray-950); font-weight: 600; font-variant-numeric: tabular-nums; }
+.dark .atp-profile-stats strong { color: #fff; }
+.atp-profile-collections { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1rem; }
+.atp-profile-collection {
+    display: inline-flex;
+    gap: 0.5rem;
+    padding: 0.25rem 0.625rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    background: color-mix(in oklab, var(--gray-500) 12%, transparent);
+    cursor: pointer;
+}
+.atp-profile-collection:hover { background: color-mix(in oklab, var(--gray-500) 22%, transparent); }

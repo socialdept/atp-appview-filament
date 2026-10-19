@@ -27,6 +27,7 @@ use SocialDept\AtpAppviewFilament\Resources\FailedDeliveries\FailedDeliveryResou
 use SocialDept\AtpAppviewFilament\Resources\FailedDeliveries\Pages\ListFailedDeliveries;
 use SocialDept\AtpAppviewFilament\Resources\Identities\IdentityResource;
 use SocialDept\AtpAppviewFilament\Resources\Identities\Pages\ListIdentities;
+use SocialDept\AtpAppviewFilament\Resources\Identities\Pages\ViewIdentity;
 use SocialDept\AtpAppviewFilament\Resources\Lexicons\LexiconResource;
 use SocialDept\AtpAppviewFilament\Resources\Lexicons\Pages\ListLexicons;
 use SocialDept\AtpAppviewFilament\Resources\Records\Pages\ListRecords;
@@ -35,6 +36,7 @@ use SocialDept\AtpAppviewFilament\Support\Avatars;
 use SocialDept\AtpAppviewFilament\Support\Json;
 use SocialDept\AtpAppviewFilament\Tests\TestCase;
 use SocialDept\AtpAppviewFilament\Widgets\CollectionsTable;
+use SocialDept\AtpAppviewFilament\Widgets\IdentityRecords;
 use SocialDept\AtpAppviewFilament\Widgets\IngestTallies;
 
 class ResourcesTest extends TestCase
@@ -90,6 +92,53 @@ class ResourcesTest extends TestCase
         Livewire::test(ListIdentities::class)
             ->assertSeeHtml('https://img.example/alice.jpg')
             ->assertSeeHtml(Avatars::placeholder('bob.test'));
+    }
+
+    public function test_an_identity_page_is_laid_out_as_its_profile_with_its_records(): void
+    {
+        $this->identity('did:plc:alice', ['handle' => 'alice.test', 'pds' => 'https://pds.example']);
+        $this->record('did:plc:alice', self::POSTS, 'a', ['text' => 'first post'], ['sort_at' => '2025-03-01 00:00:00']);
+        $this->record('did:plc:alice', self::POSTS, 'b', ['text' => 'second post']);
+        $this->record('did:plc:alice', self::LIKES, 'c');
+        $this->record('did:plc:bob', self::POSTS, 'd', ['text' => 'not alice']);
+        $profiles = Mockery::mock(Profiles::class);
+        $profiles->shouldReceive('for')->andReturn(['did:plc:alice' => [
+            'displayName' => 'Alice', 'description' => "Hello\nwww.alice.example", 'avatar' => 'https://img.example/a.jpg',
+            'banner' => 'https://img.example/b.jpg', 'pronouns' => 'she/her',
+        ]]);
+        $this->app->instance(Profiles::class, $profiles);
+
+        $page = Livewire::test(ViewIdentity::class, ['record' => 'did:plc:alice'])
+            ->assertSee('Alice')
+            ->assertSee('@alice.test')
+            ->assertSee('she/her')
+            ->assertSeeHtml('href="https://www.alice.example"')
+            ->assertSeeHtml('https://img.example/b.jpg')
+            ->assertSee('pds.example')
+            ->assertSee('Records since Mar 2025')
+            ->assertSeeHtml('<strong>3</strong> records')
+            ->assertSeeHtml('<strong>2</strong> collections');
+
+        $this->assertSame('Alice', $page->instance()->getTitle());
+        $this->assertSame('Alice', array_values($page->instance()->getBreadcrumbs())[1]);
+
+        Livewire::test(IdentityRecords::class, ['did' => 'did:plc:alice'])
+            ->assertSee('first post')
+            ->assertSee('second post')
+            ->assertDontSee('not alice')
+            // A collection chosen on the profile.
+            ->dispatch('atp-identity-collection', collection: self::LIKES)
+            ->assertDontSee('first post');
+    }
+
+    public function test_an_identity_without_a_display_name_is_named_by_its_handle(): void
+    {
+        $this->identity('did:plc:bob', ['handle' => 'bob.test']);
+        $profiles = Mockery::mock(Profiles::class);
+        $profiles->shouldReceive('for')->andReturn(['did:plc:bob' => ['displayName' => '', 'avatar' => null, 'banner' => null]]);
+        $this->app->instance(Profiles::class, $profiles);
+
+        $this->assertSame('bob.test', Livewire::test(ViewIdentity::class, ['record' => 'did:plc:bob'])->instance()->getTitle());
     }
 
     public function test_identities_list_status_records_and_reconcile_errors(): void

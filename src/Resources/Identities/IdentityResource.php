@@ -103,6 +103,7 @@ class IdentityResource extends Resource
                     ->color(fn (?string $state) => $state === 'ok' ? 'success' : 'danger')
                     ->tooltip(fn (Identity $record) => $record->reconcile_error),
             ])
+            ->recordUrl(fn (Identity $record) => self::getUrl('view', ['record' => $record]))
             // Never-reconciled repos last, on any database.
             ->defaultSort(fn (Builder $query) => $query->orderByRaw('reconciled_at is null')->orderByDesc('reconciled_at'))
             ->filters([
@@ -200,6 +201,9 @@ class IdentityResource extends Resource
 
     public static function getPages(): array
     {
-        return ['index' => Pages\ListIdentities::route('/')];
+        return [
+            'index' => Pages\ListIdentities::route('/'),
+            'view' => Pages\ViewIdentity::route('/{record}'),
+        ];
     }
 }
