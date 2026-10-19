@@ -246,62 +246,66 @@ class ViewIdentity extends ViewRecord
             // Lookups first, then links, out of the way of what changes things.
             ActionGroup::make([
                 ActionGroup::make([
-                Action::make('refresh')
-                    ->label('Refresh identity')
-                    ->icon('heroicon-o-identification')
-                    ->action(fn () => $this->refreshIdentity()),
-                Action::make('resync')
-                    ->label('Resync in Tap')
-                    ->icon('heroicon-o-arrow-down-tray')
-                    ->requiresConfirmation()
-                    ->modalDescription('Ask Tap to walk the repo again and send any record it never delivered. Records already indexed are kept, and live events for this repo wait until the resync finishes.')
-                    ->action(fn () => $this->resync()),
-                Action::make('tap')
-                    ->label('Tap status')
-                    ->icon('heroicon-o-signal')
-                    ->modalHeading('Tap status')
-                    ->modalWidth('2xl')
-                    ->modalContent(function () {
-                        try {
-                            return Json::render(app(TapAdmin::class)->info($this->record->did));
-                        } catch (Throwable $e) {
-                            return new HtmlString('<p class="atp-reconcile-error">'.e('Tap did not answer: '.$e->getMessage()).'</p>');
-                        }
-                    })
-                    ->modalSubmitAction(false),
-                Action::make('profile')
-                    ->label('Profile record')
-                    ->icon('heroicon-o-code-bracket')
-                    ->modalHeading(fn () => $this->profile()->name())
-                    ->modalWidth('4xl')
-                    ->modalContent(fn () => Json::render($this->profile()->profile, $this->record->did, $this->record->pds))
-                    ->modalSubmitAction(false),
+                    Action::make('refresh')
+                        ->label('Refresh identity')
+                        ->icon('heroicon-o-identification')
+                        ->action(fn () => $this->refreshIdentity()),
+                    Action::make('resync')
+                        ->label('Resync in Tap')
+                        ->icon('heroicon-o-arrow-down-tray')
+                        ->requiresConfirmation()
+                        ->modalDescription('Ask Tap to walk the repo again and send any record it never delivered. Records already indexed are kept, and live events for this repo wait until the resync finishes.')
+                        ->action(fn () => $this->resync()),
+                    Action::make('tap')
+                        ->label('Tap status')
+                        ->icon('heroicon-o-signal')
+                        ->modalHeading('Tap status')
+                        ->modalWidth('2xl')
+                        ->modalContent(function () {
+                            try {
+                                return Json::render(app(TapAdmin::class)->info($this->record->did));
+                            } catch (Throwable $e) {
+                                return new HtmlString('<p class="atp-reconcile-error">'.e('Tap did not answer: '.$e->getMessage()).'</p>');
+                            }
+                        })
+                        ->modalSubmitAction(false),
+                    Action::make('profile')
+                        ->label('Profile record')
+                        ->icon('heroicon-o-code-bracket')
+                        ->modalHeading(fn () => $this->profile()->name())
+                        ->modalWidth('4xl')
+                        ->modalContent(fn () => Json::render($this->profile()->profile, $this->record->did, $this->record->pds))
+                        ->modalSubmitAction(false),
                 ])->dropdown(false),
+                // Elsewhere in the panel.
                 ActionGroup::make([
-                Action::make('records')
-                    ->label('Open in Records')
-                    ->icon('heroicon-o-document-text')
-                    ->visible(fn () => IdentityResource::recordsPage())
-                    ->url(fn () => RecordResource::getUrl('index', ['filters' => ['did' => ['value' => $this->record->did]]])),
-                Action::make('open')
-                    ->label('Open repo')
-                    ->icon('heroicon-o-arrow-top-right-on-square')
-                    ->url(fn () => Links::repo($this->record->did), shouldOpenInNewTab: true),
-                // By DID, which outlives a handle change.
-                Action::make('bluesky')
-                    ->label('Open in Bluesky')
-                    ->icon('heroicon-o-user-circle')
-                    ->url(fn () => 'https://bsky.app/profile/'.$this->record->did, shouldOpenInNewTab: true),
-                Action::make('pds')
-                    ->label('Open PDS')
-                    ->icon('heroicon-o-globe-alt')
-                    ->visible(fn () => $this->record->pds !== null)
-                    ->url(fn () => $this->record->pds, shouldOpenInNewTab: true),
-                Action::make('plc')
-                    ->label('PLC audit log')
-                    ->icon('heroicon-o-finger-print')
-                    ->visible(fn () => str_starts_with($this->record->did, 'did:plc:'))
-                    ->url(fn () => 'https://plc.directory/'.$this->record->did.'/log/audit', shouldOpenInNewTab: true),
+                    Action::make('records')
+                        ->label('Open in Records')
+                        ->icon('heroicon-o-document-text')
+                        ->visible(fn () => IdentityResource::recordsPage())
+                        ->url(fn () => RecordResource::getUrl('index', ['filters' => ['did' => ['value' => $this->record->did]]])),
+                ])->dropdown(false),
+                // Outside the panel, in a new tab.
+                ActionGroup::make([
+                    // By DID, which outlives a handle change.
+                    Action::make('bluesky')
+                        ->label('Open in Bluesky')
+                        ->icon('heroicon-o-user-circle')
+                        ->url(fn () => 'https://bsky.app/profile/'.$this->record->did, shouldOpenInNewTab: true),
+                    Action::make('open')
+                        ->label('Open repo')
+                        ->icon('heroicon-o-arrow-top-right-on-square')
+                        ->url(fn () => Links::repo($this->record->did), shouldOpenInNewTab: true),
+                    Action::make('pds')
+                        ->label('Open PDS')
+                        ->icon('heroicon-o-globe-alt')
+                        ->visible(fn () => $this->record->pds !== null)
+                        ->url(fn () => $this->record->pds, shouldOpenInNewTab: true),
+                    Action::make('plc')
+                        ->label('PLC audit log')
+                        ->icon('heroicon-o-finger-print')
+                        ->visible(fn () => str_starts_with($this->record->did, 'did:plc:'))
+                        ->url(fn () => 'https://plc.directory/'.$this->record->did.'/log/audit', shouldOpenInNewTab: true),
                 ])->dropdown(false),
             ])
                 ->label('More')
