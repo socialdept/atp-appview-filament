@@ -7,11 +7,14 @@ use Filament\Support\Facades\FilamentAsset;
 use Illuminate\Support\ServiceProvider;
 use Livewire\Livewire;
 use SocialDept\AtpAppviewFilament\Livewire\BackfillNotice;
+use SocialDept\AtpAppviewFilament\Support\Avatars;
 
 class AtpAppviewFilamentServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
+        // Once per request, so a page's avatars are looked up together.
+        $this->app->scoped(Avatars::class);
     }
 
     public function boot(): void

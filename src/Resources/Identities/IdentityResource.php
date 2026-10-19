@@ -7,7 +7,9 @@ use Filament\Actions\BulkAction;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
+use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TernaryFilter;
@@ -20,6 +22,7 @@ use SocialDept\AtpAppview\Models\Identity;
 use SocialDept\AtpAppviewFilament\AtpAppviewPlugin;
 use SocialDept\AtpAppviewFilament\Resources\Concerns\InPluginNavigationGroup;
 use SocialDept\AtpAppviewFilament\Resources\Records\RecordResource;
+use SocialDept\AtpAppviewFilament\Support\Avatars;
 use SocialDept\AtpAppviewFilament\Support\Json;
 use SocialDept\AtpAppviewFilament\Support\Links;
 use Throwable;
@@ -53,6 +56,13 @@ class IdentityResource extends Resource
     {
         return $table
             ->columns([
+                ImageColumn::make('avatar')
+                    ->label('')
+                    ->state(fn (Identity $record, HasTable $livewire) => app(Avatars::class)->of($record->did, fn () => $livewire->getTableRecords()->pluck('did')->all()))
+                    ->defaultImageUrl(fn (Identity $record) => Avatars::placeholder($record->handle))
+                    ->circular()
+                    ->imageSize(32)
+                    ->grow(false),
                 TextColumn::make('handle')
                     ->formatStateUsing(fn (?string $state) => $state === null ? null : '@'.$state)
                     ->limit(40)

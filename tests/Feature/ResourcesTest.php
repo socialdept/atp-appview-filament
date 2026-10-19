@@ -19,6 +19,7 @@ use SocialDept\AtpAppview\Models\FailedDelivery;
 use SocialDept\AtpAppview\Models\FollowedLexicon;
 use SocialDept\AtpAppview\Models\Identity;
 use SocialDept\AtpAppview\Models\Record;
+use SocialDept\AtpAppview\Profiles\Profiles;
 use SocialDept\AtpAppviewFilament\AtpAppviewPlugin;
 use SocialDept\AtpAppviewFilament\Resources\Blocks\BlockResource;
 use SocialDept\AtpAppviewFilament\Resources\Blocks\Pages\ListBlocks;
@@ -30,6 +31,7 @@ use SocialDept\AtpAppviewFilament\Resources\Lexicons\LexiconResource;
 use SocialDept\AtpAppviewFilament\Resources\Lexicons\Pages\ListLexicons;
 use SocialDept\AtpAppviewFilament\Resources\Records\Pages\ListRecords;
 use SocialDept\AtpAppviewFilament\Resources\Records\RecordResource;
+use SocialDept\AtpAppviewFilament\Support\Avatars;
 use SocialDept\AtpAppviewFilament\Support\Json;
 use SocialDept\AtpAppviewFilament\Tests\TestCase;
 use SocialDept\AtpAppviewFilament\Widgets\CollectionsTable;
@@ -73,6 +75,21 @@ class ResourcesTest extends TestCase
 
         $this->assertSame($before, $panel->getResources(), 'Leaving every resource out adds none.');
         $this->assertFalse(AtpAppviewPlugin::make()->records(false)->hasRecords());
+    }
+
+    public function test_identities_show_avatars_looked_up_once_per_page(): void
+    {
+        $this->identity('did:plc:alice', ['handle' => 'alice.test']);
+        $this->identity('did:plc:bob', ['handle' => 'bob.test']);
+        $profiles = Mockery::mock(Profiles::class);
+        $profiles->shouldReceive('basic')->once()
+            ->withArgs(fn (array $dids) => count($dids) === 2)
+            ->andReturn(['did:plc:alice' => ['avatar' => 'https://img.example/alice.jpg'], 'did:plc:bob' => ['avatar' => null]]);
+        $this->app->instance(Profiles::class, $profiles);
+
+        Livewire::test(ListIdentities::class)
+            ->assertSeeHtml('https://img.example/alice.jpg')
+            ->assertSeeHtml(Avatars::placeholder('bob.test'));
     }
 
     public function test_identities_list_status_records_and_reconcile_errors(): void
