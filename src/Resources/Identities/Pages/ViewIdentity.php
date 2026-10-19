@@ -157,6 +157,11 @@ class ViewIdentity extends ViewRecord
                     ->label('Open repo')
                     ->icon('heroicon-o-arrow-top-right-on-square')
                     ->url(fn () => Links::repo($this->record->did), shouldOpenInNewTab: true),
+                // By DID, which outlives a handle change.
+                Action::make('bluesky')
+                    ->label('Open in Bluesky')
+                    ->icon('heroicon-o-user-circle')
+                    ->url(fn () => 'https://bsky.app/profile/'.$this->record->did, shouldOpenInNewTab: true),
                 Action::make('pds')
                     ->label('Open PDS')
                     ->icon('heroicon-o-globe-alt')

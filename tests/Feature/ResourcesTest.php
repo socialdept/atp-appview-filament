@@ -166,6 +166,7 @@ class ResourcesTest extends TestCase
             ->assertActionVisible('reconcile')
             ->assertActionVisible('profile')
             ->assertActionHasUrl('open', Links::repo('did:plc:alice'))
+            ->assertActionHasUrl('bluesky', 'https://bsky.app/profile/did:plc:alice')
             ->assertActionHasUrl('pds', 'https://pds.example')
             ->assertActionHasUrl('plc', 'https://plc.directory/did:plc:alice/log/audit')
             ->assertActionHasUrl('records', RecordResource::getUrl('index', ['filters' => ['did' => ['value' => 'did:plc:alice']]]));
