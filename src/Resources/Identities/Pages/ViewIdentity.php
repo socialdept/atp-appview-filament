@@ -108,7 +108,7 @@ class ViewIdentity extends ViewRecord
         try {
             $result = app(IdentityRefresh::class)->refresh($this->record->did);
         } catch (Throwable $e) {
-            Notification::make()->title('Could not read the DID document')->body($e->getMessage())->danger()->send();
+            Notification::make()->title('Could not read the DID document')->body(e($e->getMessage()))->danger()->send();
 
             return;
         }
@@ -117,7 +117,7 @@ class ViewIdentity extends ViewRecord
 
         Notification::make()
             ->title('Identity refreshed')
-            ->body($changes !== '' ? $changes : 'Handle and PDS unchanged. The cached profile was dropped.')
+            ->body(e($changes !== '' ? $changes : 'Handle and PDS unchanged. The cached profile was dropped.'))
             ->success()
             ->send();
 
@@ -134,14 +134,14 @@ class ViewIdentity extends ViewRecord
 
             return;
         } catch (Throwable $e) {
-            Notification::make()->title('Tap did not answer')->body($e->getMessage())->danger()->send();
+            Notification::make()->title('Tap did not answer')->body(e($e->getMessage()))->danger()->send();
 
             return;
         }
 
         $state === null
             ? Notification::make()->title('Tap does not track this repo')->warning()->send()
-            : Notification::make()->title('Resync queued')->body("Tap reports the repo as {$state}.")->success()->send();
+            : Notification::make()->title('Resync queued')->body(e("Tap reports the repo as {$state}."))->success()->send();
     }
 
     protected function profile(): IdentityProfile
@@ -198,7 +198,7 @@ class ViewIdentity extends ViewRecord
                     try {
                         $outcome = app(Blocklist::class)->block($this->record->did, $data['collection'] ?: null, $data['note'] ?: null, (bool) $data['purge']);
                     } catch (Throwable $e) {
-                        Notification::make()->title('Could not block')->body($e->getMessage())->danger()->send();
+                        Notification::make()->title('Could not block')->body(e($e->getMessage()))->danger()->send();
 
                         return;
                     }

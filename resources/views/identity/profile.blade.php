@@ -9,7 +9,13 @@
 @endphp
 
 <div class="atp-profile">
-    <div class="atp-profile-banner" @if ($p->profile['banner'] ?? null) style="background-image: url('{{ $p->profile['banner'] }}')" @endif></div>
+    {{-- An img, not an inline style: the URL carries a CID from the record,
+         which has no business in a CSS context. --}}
+    <div class="atp-profile-banner">
+        @if ($p->profile['banner'] ?? null)
+            <img src="{{ $p->profile['banner'] }}" alt="">
+        @endif
+    </div>
 
     <div class="atp-profile-body">
         <img
