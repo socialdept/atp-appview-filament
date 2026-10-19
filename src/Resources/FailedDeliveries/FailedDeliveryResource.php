@@ -147,7 +147,7 @@ class FailedDeliveryResource extends Resource
                     ->action(function (Collection $records) {
                         $count = FailedDelivery::query()->whereKey($records->modelKeys())->delete();
 
-                        Notification::make()->title(number_format($count).' forgotten')->success()->send();
+                        Notification::make()->title(e(number_format($count).' forgotten'))->success()->send();
                     })
                     ->deselectRecordsAfterCompletion(),
             ]);
@@ -185,8 +185,8 @@ class FailedDeliveryResource extends Resource
         ])->filter()->implode('. ');
 
         Notification::make()
-            ->title(number_format($done).' went through')
-            ->body($body ?: null)
+            ->title(e(number_format($done).' went through'))
+            ->body(e($body ?: null))
             ->{$failed === [] ? 'success' : 'warning'}()
             ->send();
     }

@@ -114,7 +114,7 @@ class LexiconResource extends Resource
                     ->action(function (FollowedLexicon $record) {
                         $revision = app(LexiconFollower::class)->accept($record->nsid);
 
-                        Notification::make()->title("{$record->nsid} is now r{$revision}")->success()->send();
+                        Notification::make()->title(e("{$record->nsid} is now r{$revision}"))->success()->send();
                     }),
                 Action::make('sync')
                     ->iconButton()
@@ -157,22 +157,22 @@ class LexiconResource extends Resource
             try {
                 $outcomes[] = $follower->sync($nsid);
             } catch (Throwable $e) {
-                Notification::make()->title("Could not check {$nsid}")->body($e->getMessage())->danger()->send();
+                Notification::make()->title(e("Could not check {$nsid}"))->body(e($e->getMessage()))->danger()->send();
             }
         }
 
         $changed = collect($outcomes)->reject(fn (FollowResult $result) => $result->outcome === FollowResult::UNCHANGED);
 
         if ($changed->isEmpty()) {
-            Notification::make()->title(count($outcomes) === 1 ? 'No new version' : 'No new versions')->success()->send();
+            Notification::make()->title(e(count($outcomes) === 1 ? 'No new version' : 'No new versions'))->success()->send();
 
             return;
         }
 
         foreach ($changed as $result) {
             Notification::make()
-                ->title("{$result->nsid}: {$result->outcome}")
-                ->body($result->revision === null ? null : 'r'.$result->revision)
+                ->title(e("{$result->nsid}: {$result->outcome}"))
+                ->body(e($result->revision === null ? null : 'r'.$result->revision))
                 ->color($result->outcome === FollowResult::REFUSED ? 'danger' : 'success')
                 ->send();
         }

@@ -93,7 +93,7 @@ class BlockResource extends Resource
                         try {
                             $outcome = app(Blocklist::class)->block($data['subject'], $data['collection'] ?: null, $data['note'] ?: null, (bool) $data['purge']);
                         } catch (Throwable $e) {
-                            Notification::make()->title('Could not block')->body($e->getMessage())->danger()->send();
+                            Notification::make()->title('Could not block')->body(e($e->getMessage()))->danger()->send();
 
                             return;
                         }
@@ -112,7 +112,7 @@ class BlockResource extends Resource
                     ->action(function (Block $record) {
                         $purged = app(Blocklist::class)->purge($record);
 
-                        Notification::make()->title(number_format($purged).' '.str('record')->plural($purged).' deleted')->success()->send();
+                        Notification::make()->title(e(number_format($purged).' '.str('record')->plural($purged).' deleted'))->success()->send();
                     }),
                 Action::make('unblock')
                     ->iconButton()
@@ -143,8 +143,8 @@ class BlockResource extends Resource
         ])->filter()->implode(', ');
 
         $outcome->tapError === null
-            ? Notification::make()->title($title)->body($body ?: null)->success()->send()
-            : Notification::make()->title($title)->body("Tap was not updated: {$outcome->tapError}. The rule still applies at ingest.")->warning()->send();
+            ? Notification::make()->title(e($title))->body(e($body ?: null))->success()->send()
+            : Notification::make()->title(e($title))->body(e("Tap was not updated: {$outcome->tapError}. The rule still applies at ingest."))->warning()->send();
     }
 
     public static function getPages(): array

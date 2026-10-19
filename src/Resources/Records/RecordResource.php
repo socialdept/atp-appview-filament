@@ -64,7 +64,9 @@ class RecordResource extends Resource
                     ->label('Repo')
                     ->formatStateUsing(fn (?string $state) => $state === null ? null : '@'.$state)
                     ->placeholder(fn (Record $record) => $record->did)
-                    ->url(fn (Record $record) => Links::repo($record->did), shouldOpenInNewTab: true),
+                    // The identity's page when the index knows it, the repo elsewhere otherwise.
+                    ->url(fn (Record $record) => IdentityResource::linkTo($record->did, $record->identity !== null))
+                    ->openUrlInNewTab(fn (Record $record) => $record->identity === null),
                 TextColumn::make('state')
                     ->state(fn (Record $record) => match (true) {
                         $record->deleted_at !== null => 'tombstone',

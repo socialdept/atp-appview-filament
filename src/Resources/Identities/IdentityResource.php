@@ -168,7 +168,7 @@ class IdentityResource extends Resource
                             }
                         })->count();
 
-                        Notification::make()->title("Reconciled {$ok} of {$records->count()} repos")->success()->send();
+                        Notification::make()->title(e("Reconciled {$ok} of {$records->count()} repos"))->success()->send();
                     }),
             ]);
     }
@@ -182,12 +182,27 @@ class IdentityResource extends Resource
         try {
             $result = app(Reconciler::class)->reconcileAndRecord($did);
         } catch (Throwable $e) {
-            Notification::make()->title('Could not reconcile')->body($e->getMessage())->danger()->send();
+            Notification::make()->title('Could not reconcile')->body(e($e->getMessage()))->danger()->send();
 
             return;
         }
 
-        Notification::make()->title('Reconciled')->body($result->summary())->success()->send();
+        Notification::make()->title('Reconciled')->body(e($result->summary()))->success()->send();
+    }
+
+    /**
+     * The identity's page in the panel, when the plugin has one, otherwise
+     * where recordLinks() sends a DID.
+     */
+    public static function linkTo(string $did, bool $known = true): string
+    {
+        try {
+            $page = $known && AtpAppviewPlugin::get()->hasIdentities();
+        } catch (Throwable) {
+            $page = false;
+        }
+
+        return $page ? self::getUrl('view', ['record' => $did]) : Links::repo($did);
     }
 
     public static function recordsPage(): bool

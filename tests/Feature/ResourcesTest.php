@@ -245,6 +245,34 @@ class ResourcesTest extends TestCase
             ->assertMountedActionModalSee('active');
     }
 
+    public function test_an_identity_page_never_renders_markup_from_the_profile(): void
+    {
+        Http::fake();
+        $this->identity('did:plc:evil', ['handle' => 'evil.test']);
+        $profiles = Mockery::mock(Profiles::class);
+        $profiles->shouldReceive('for')->andReturn(['did:plc:evil' => [
+            'displayName' => '<script>alert("name")</script>',
+            'description' => "<img src=x onerror=alert(1)>\nhttps://example.com/\"><script>alert(2)</script>",
+            'pronouns' => '<b>bold</b>',
+            'website' => 'javascript:alert(3)',
+            'avatar' => 'https://img.example/a.jpg" onerror="alert(4)',
+            'banner' => "https://img.example/b.jpg') no-repeat; background: url('https://evil.example/x",
+        ]]);
+        $this->app->instance(Profiles::class, $profiles);
+
+        Livewire::test(ViewIdentity::class, ['record' => 'did:plc:evil'])
+            ->assertDontSeeHtml('<script>alert')
+            ->assertDontSeeHtml('<img src=x')
+            ->assertDontSeeHtml('<b>bold</b>')
+            ->assertDontSeeHtml('javascript:alert')
+            ->assertDontSeeHtml('" onerror="alert(4)')
+            ->assertDontSeeHtml('style="background-image')
+            ->assertSeeHtml('&lt;script&gt;alert(&quot;name&quot;)&lt;/script&gt;')
+            ->callAction('block', data: ['collection' => '', 'note' => '', 'purge' => false])
+            // Notifications render HTML, so the name reaches them escaped.
+            ->assertNotified(e('Blocked <script>alert("name")</script>'));
+    }
+
     public function test_an_identity_without_a_display_name_is_named_by_its_handle(): void
     {
         $this->identity('did:plc:bob', ['handle' => 'bob.test']);
@@ -293,6 +321,22 @@ class ResourcesTest extends TestCase
         $this->assertNotNull($listing);
         $this->assertStringNotContainsString('records_count', $listing);
         $page->assertCanSeeTableRecords(Identity::query()->whereIn('did', ['did:plc:repo021', 'did:plc:repo025'])->get());
+    }
+
+    public function test_a_records_repo_links_to_its_identity_page(): void
+    {
+        $this->identity('did:plc:alice', ['handle' => 'alice.test']);
+        $this->record('did:plc:alice', self::POSTS, 'a', ['text' => 'known']);
+        $this->record('did:plc:stranger', self::POSTS, 'b', ['text' => 'unknown']);
+
+        Livewire::test(ListRecords::class)
+            ->assertSeeHtml(e(IdentityResource::getUrl('view', ['record' => 'did:plc:alice'])))
+            // A repo the index has no identity for still links out.
+            ->assertSeeHtml(e(Links::repo('did:plc:stranger')))
+            ->assertDontSeeHtml(e(IdentityResource::getUrl('view', ['record' => 'did:plc:stranger'])));
+
+        AtpAppviewPlugin::get()->identities(false);
+        $this->assertSame(Links::repo('did:plc:alice'), IdentityResource::linkTo('did:plc:alice'), 'Without the Identities page, the repo links out.');
     }
 
     public function test_records_list_without_counting_the_whole_collection(): void

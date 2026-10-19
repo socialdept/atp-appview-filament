@@ -159,6 +159,11 @@ class AtpAppviewPlugin implements Plugin
         return $this;
     }
 
+    public function hasIdentities(): bool
+    {
+        return $this->identities;
+    }
+
     public function hasRecords(): bool
     {
         return $this->records;

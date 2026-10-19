@@ -111,9 +111,10 @@
     aspect-ratio: 3 / 1;
     max-height: 16rem;
     width: 100%;
-    background: linear-gradient(135deg, var(--primary-400), var(--primary-700)) center / cover no-repeat;
+    overflow: hidden;
+    background: linear-gradient(135deg, var(--primary-400), var(--primary-700));
 }
-.atp-profile-banner[style] { background-size: cover; background-position: center; }
+.atp-profile-banner img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .atp-profile-body { padding: 0 1.5rem 1.5rem; }
 .atp-profile-avatar {
     width: 6rem;
