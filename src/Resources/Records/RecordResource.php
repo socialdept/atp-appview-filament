@@ -19,6 +19,7 @@ use SocialDept\AtpAppviewFilament\Resources\Concerns\InPluginNavigationGroup;
 use SocialDept\AtpAppviewFilament\Resources\Identities\IdentityResource;
 use SocialDept\AtpAppviewFilament\Support\Json;
 use SocialDept\AtpAppviewFilament\Support\Links;
+use SocialDept\AtpAppviewFilament\Support\RecordLabels;
 
 /**
  * The index, a collection at a time: the indexes sort within a collection,
@@ -75,6 +76,7 @@ class RecordResource extends Resource
                     })
                     ->badge()
                     ->color(fn (?string $state) => $state === 'tombstone' ? 'danger' : 'warning'),
+                RecordLabels::column(),
                 TextColumn::make('sort_at')->label('Made')->since()->sortable()->color('gray'),
                 TextColumn::make('indexed_at')->label('Indexed')->since()->color('gray'),
             ])

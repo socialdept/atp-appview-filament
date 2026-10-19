@@ -37,6 +37,18 @@
             @if ($p->blockedByHost)
                 <x-filament::badge color="danger" size="sm" icon="heroicon-m-no-symbol">Blocked by its host</x-filament::badge>
             @endif
+            @if ($p->banned())
+                <x-filament::badge color="danger" size="sm" icon="heroicon-m-user-minus">Banned</x-filament::badge>
+            @endif
+            @if ($p->reviewed())
+                <x-filament::badge color="warning" size="sm" icon="heroicon-m-eye-slash">Needs review</x-filament::badge>
+            @endif
+            @if ($p->takenDown())
+                <x-filament::badge color="danger" size="sm" icon="heroicon-m-server-stack">Taken down</x-filament::badge>
+            @endif
+            @if ($p->hosted)
+                <x-filament::badge color="gray" size="sm" icon="heroicon-m-home">Hosted here</x-filament::badge>
+            @endif
         </div>
 
         <div class="atp-profile-handle atp-muted">
@@ -49,6 +61,16 @@
                 <span>· {{ $pronouns }}</span>
             @endif
         </div>
+
+        @if ($p->accountLabels !== [])
+            <div class="atp-profile-labels">
+                @foreach ($p->accountLabels as $item)
+                    <x-filament::badge :color="\SocialDept\AtpAppviewFilament\Support\LabelBadges::color($item['effect'])" size="sm" :tooltip="$item['label']->src.' · '.$item['effect']->value">
+                        {{ $item['label']->val }}
+                    </x-filament::badge>
+                @endforeach
+            </div>
+        @endif
 
         @if ($bio = $p->bio())
             <p class="atp-profile-bio">{{ $bio }}</p>

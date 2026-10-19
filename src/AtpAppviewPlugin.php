@@ -7,9 +7,11 @@ use Filament\Contracts\Plugin;
 use Filament\Panel;
 use Filament\View\PanelsRenderHook;
 use Illuminate\Support\Facades\Blade;
+use SocialDept\AtpAppviewFilament\Resources\AccountActions\AccountActionResource;
 use SocialDept\AtpAppviewFilament\Resources\Blocks\BlockResource;
 use SocialDept\AtpAppviewFilament\Resources\FailedDeliveries\FailedDeliveryResource;
 use SocialDept\AtpAppviewFilament\Resources\Identities\IdentityResource;
+use SocialDept\AtpAppviewFilament\Resources\Labelers\LabelerResource;
 use SocialDept\AtpAppviewFilament\Resources\Lexicons\LexiconResource;
 use SocialDept\AtpAppviewFilament\Resources\Records\RecordResource;
 use SocialDept\AtpAppviewFilament\Widgets\BackfillsWidget;
@@ -40,6 +42,10 @@ class AtpAppviewPlugin implements Plugin
     protected bool $blocklist = true;
 
     protected bool $failedDeliveries = true;
+
+    protected bool $labelers = true;
+
+    protected bool $moderation = true;
 
     /** @var (Closure(string): string)|null */
     protected ?Closure $recordLinks = null;
@@ -159,6 +165,31 @@ class AtpAppviewPlugin implements Plugin
         return $this;
     }
 
+    /**
+     * The Labelers page: the labelers Tack follows and what their labels do.
+     */
+    public function labelers(bool $condition = true): static
+    {
+        $this->labelers = $condition;
+
+        return $this;
+    }
+
+    /**
+     * The Moderation log, and the Moderate menu on identity pages.
+     */
+    public function moderation(bool $condition = true): static
+    {
+        $this->moderation = $condition;
+
+        return $this;
+    }
+
+    public function hasModeration(): bool
+    {
+        return $this->moderation;
+    }
+
     public function hasIdentities(): bool
     {
         return $this->identities;
@@ -194,6 +225,8 @@ class AtpAppviewPlugin implements Plugin
             LexiconResource::class => $this->lexicons,
             BlockResource::class => $this->blocklist,
             FailedDeliveryResource::class => $this->failedDeliveries,
+            LabelerResource::class => $this->labelers,
+            AccountActionResource::class => $this->moderation,
         ])));
 
         if ($this->dashboardWidgets) {

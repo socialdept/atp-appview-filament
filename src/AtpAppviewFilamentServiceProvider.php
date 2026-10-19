@@ -8,6 +8,7 @@ use Illuminate\Support\ServiceProvider;
 use Livewire\Livewire;
 use SocialDept\AtpAppviewFilament\Livewire\BackfillNotice;
 use SocialDept\AtpAppviewFilament\Support\Avatars;
+use SocialDept\AtpAppviewFilament\Support\RecordLabels;
 
 class AtpAppviewFilamentServiceProvider extends ServiceProvider
 {
@@ -15,6 +16,7 @@ class AtpAppviewFilamentServiceProvider extends ServiceProvider
     {
         // Once per request, so a page's avatars are looked up together.
         $this->app->scoped(Avatars::class);
+        $this->app->scoped(RecordLabels::class);
     }
 
     public function boot(): void

@@ -15,6 +15,7 @@ use SocialDept\AtpAppview\Models\Record;
 use SocialDept\AtpAppviewFilament\Resources\Records\RecordResource;
 use SocialDept\AtpAppviewFilament\Support\Json;
 use SocialDept\AtpAppviewFilament\Support\Links;
+use SocialDept\AtpAppviewFilament\Support\RecordLabels;
 
 /**
  * One repo's records, newest first, across its collections. Read through
@@ -56,6 +57,7 @@ class IdentityRecords extends TableWidget
                     })
                     ->badge()
                     ->color(fn (?string $state) => $state === 'tombstone' ? 'danger' : 'warning'),
+                RecordLabels::column(),
                 TextColumn::make('sort_at')->label('Made')->since()->sortable()->color('gray'),
                 TextColumn::make('indexed_at')->label('Indexed')->since()->color('gray'),
             ])

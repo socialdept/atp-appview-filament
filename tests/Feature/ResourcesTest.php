@@ -17,13 +17,22 @@ use SocialDept\AtpAppview\Ingest\FailedDeliveries;
 use SocialDept\AtpAppview\Ingest\Rejections;
 use SocialDept\AtpAppview\Ingest\Repairs;
 use SocialDept\AtpAppview\Ingest\TapAdmin;
+use SocialDept\AtpAppview\Labels\Effect;
+use SocialDept\AtpAppview\Labels\Labels;
+use SocialDept\AtpAppview\Labels\Target;
+use SocialDept\AtpAppview\Models\AccountAction;
 use SocialDept\AtpAppview\Models\Block;
 use SocialDept\AtpAppview\Models\FailedDelivery;
 use SocialDept\AtpAppview\Models\FollowedLexicon;
 use SocialDept\AtpAppview\Models\Identity;
+use SocialDept\AtpAppview\Models\Label;
+use SocialDept\AtpAppview\Models\Labeler;
+use SocialDept\AtpAppview\Models\LabelPolicy;
 use SocialDept\AtpAppview\Models\Record;
 use SocialDept\AtpAppview\Profiles\Profiles;
 use SocialDept\AtpAppviewFilament\AtpAppviewPlugin;
+use SocialDept\AtpAppviewFilament\Resources\AccountActions\AccountActionResource;
+use SocialDept\AtpAppviewFilament\Resources\AccountActions\Pages\ListAccountActions as AccountActionsListPage;
 use SocialDept\AtpAppviewFilament\Resources\Blocks\BlockResource;
 use SocialDept\AtpAppviewFilament\Resources\Blocks\Pages\ListBlocks;
 use SocialDept\AtpAppviewFilament\Resources\FailedDeliveries\FailedDeliveryResource;
@@ -31,6 +40,8 @@ use SocialDept\AtpAppviewFilament\Resources\FailedDeliveries\Pages\ListFailedDel
 use SocialDept\AtpAppviewFilament\Resources\Identities\IdentityResource;
 use SocialDept\AtpAppviewFilament\Resources\Identities\Pages\ListIdentities;
 use SocialDept\AtpAppviewFilament\Resources\Identities\Pages\ViewIdentity;
+use SocialDept\AtpAppviewFilament\Resources\Labelers\LabelerResource;
+use SocialDept\AtpAppviewFilament\Resources\Labelers\Pages\ListLabelers;
 use SocialDept\AtpAppviewFilament\Resources\Lexicons\LexiconResource;
 use SocialDept\AtpAppviewFilament\Resources\Lexicons\Pages\ListLexicons;
 use SocialDept\AtpAppviewFilament\Resources\Records\Pages\ListRecords;
@@ -42,6 +53,7 @@ use SocialDept\AtpAppviewFilament\Tests\TestCase;
 use SocialDept\AtpAppviewFilament\Widgets\CollectionsTable;
 use SocialDept\AtpAppviewFilament\Widgets\IdentityRecords;
 use SocialDept\AtpAppviewFilament\Widgets\IngestTallies;
+use SocialDept\AtpAppviewFilament\Widgets\LabelerValues;
 
 class ResourcesTest extends TestCase
 {
@@ -66,7 +78,7 @@ class ResourcesTest extends TestCase
     public function test_the_plugin_registers_every_resource_in_its_navigation_group(): void
     {
         $this->assertEqualsCanonicalizing(
-            [IdentityResource::class, RecordResource::class, LexiconResource::class, BlockResource::class, FailedDeliveryResource::class],
+            [IdentityResource::class, RecordResource::class, LexiconResource::class, BlockResource::class, FailedDeliveryResource::class, LabelerResource::class, AccountActionResource::class],
             Filament::getPanel('admin')->getResources(),
         );
         $this->assertSame('AppView', IdentityResource::getNavigationGroup());
@@ -77,7 +89,7 @@ class ResourcesTest extends TestCase
         $panel = Filament::getPanel('admin');
         $before = $panel->getResources();
 
-        AtpAppviewPlugin::make()->identities(false)->records(false)->lexicons(false)->blocklist(false)->failedDeliveries(false)->dashboardWidgets(false)->backfillNotice(false)->register($panel);
+        AtpAppviewPlugin::make()->identities(false)->records(false)->lexicons(false)->blocklist(false)->failedDeliveries(false)->labelers(false)->moderation(false)->dashboardWidgets(false)->backfillNotice(false)->register($panel);
 
         $this->assertSame($before, $panel->getResources(), 'Leaving every resource out adds none.');
         $this->assertFalse(AtpAppviewPlugin::make()->records(false)->hasRecords());
@@ -271,6 +283,57 @@ class ResourcesTest extends TestCase
             ->callAction('block', data: ['collection' => '', 'note' => '', 'purge' => false])
             // Notifications render HTML, so the name reaches them escaped.
             ->assertNotified(e('Blocked <script>alert("name")</script>'));
+    }
+
+    public function test_an_identity_is_banned_reviewed_and_taken_down_from_the_moderate_menu(): void
+    {
+        Http::fake(['pds.example/*' => Http::response(['takedown' => ['applied' => true]])]);
+        config(['atp-appview.pds.hosts' => [['driver' => 'admin', 'url' => 'https://pds.example', 'password' => 'secret']]]);
+        $this->identity('did:plc:alice', ['handle' => 'alice.test', 'pds' => 'https://pds.example']);
+        $this->record('did:plc:alice', self::POSTS, 'a', ['text' => 'hello']);
+
+        $page = Livewire::test(ViewIdentity::class, ['record' => 'did:plc:alice'])
+            ->assertSee('Hosted here')
+            ->assertActionHidden('unban')
+            ->callAction('ban', data: ['reason' => 'spam'])
+            ->assertNotified()
+            ->assertSee('Banned')
+            ->assertActionVisible('unban')
+            ->assertActionVisible('cancelPrune')
+            ->callAction('review', data: ['reason' => 'check'])
+            ->assertSee('Needs review')
+            ->callAction('takedown', data: ['reason' => 'illegal'])
+            ->assertSee('Taken down')
+            ->assertActionVisible('restore');
+
+        $this->assertSame(['ban', 'review', 'takedown'], AccountAction::query()->orderBy('id')->pluck('action')->all());
+        $this->assertSame('spam', AccountAction::query()->where('action', 'ban')->value('reason'));
+        $this->assertSame(0, Record::query()->where('did', 'did:plc:alice')->count(), 'The ban hides what it wrote.');
+
+        $page->callAction('unban')->assertActionVisible('ban');
+        $this->assertSame(1, Record::query()->where('did', 'did:plc:alice')->count());
+    }
+
+    public function test_labelers_show_their_values_and_what_each_does_and_policies_change_from_there(): void
+    {
+        Labeler::query()->create(['did' => 'did:plc:mod', 'declaration' => ['policies' => [
+            'labelValues' => ['rude'],
+            'labelValueDefinitions' => [['identifier' => 'rude', 'severity' => 'alert', 'blurs' => 'none', 'defaultSetting' => 'warn', 'locales' => [['lang' => 'en', 'name' => 'Rude', 'description' => 'Not nice']]]],
+        ]]]);
+        Label::query()->create(['src' => 'did:plc:mod', 'uri' => 'did:plc:alice', 'subject' => 'did:plc:alice', 'val' => 'rude', 'cts' => '2026-01-01T00:00:00.000Z']);
+
+        Livewire::test(ListLabelers::class)->assertSee('did:plc:mod');
+
+        Livewire::test(LabelerValues::class, ['did' => 'did:plc:mod'])
+            ->assertSee('Rude')
+            ->assertSee('warn')
+            ->callTableAction('change', 'rude', data: ['content' => 'hide', 'account' => 'default'])
+            ->assertNotified();
+
+        $this->assertSame('hide', LabelPolicy::query()->sole()->effect->value);
+        $this->assertSame(Effect::Hide, app(Labels::class)->effect('did:plc:mod', 'rude', Target::CONTENT));
+
+        Livewire::test(AccountActionsListPage::class)->assertOk();
     }
 
     public function test_an_identity_without_a_display_name_is_named_by_its_handle(): void
