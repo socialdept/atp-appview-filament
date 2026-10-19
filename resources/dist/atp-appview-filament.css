@@ -158,3 +158,5 @@
 .atp-reconcile-heading { font-weight: 600; margin-top: 0.25rem; }
 .atp-reconcile-list { display: grid; gap: 0.25rem; font-size: 0.75rem; overflow-wrap: anywhere; }
 .atp-reconcile-list a:hover { text-decoration: underline; }
+
+.atp-profile-labels { display: flex; flex-wrap: wrap; gap: 0.375rem; margin-top: 0.625rem; }

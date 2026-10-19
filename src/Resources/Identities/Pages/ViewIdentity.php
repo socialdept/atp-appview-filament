@@ -24,6 +24,7 @@ use SocialDept\AtpAppview\Ingest\TapFeatureUnavailableException;
 use SocialDept\AtpAppview\Models\Block;
 use SocialDept\AtpAppview\Models\FailedDelivery;
 use SocialDept\AtpAppview\Models\Identity;
+use SocialDept\AtpAppview\Moderation\AccountActions;
 use SocialDept\AtpAppviewFilament\Resources\Blocks\BlockResource;
 use SocialDept\AtpAppviewFilament\Resources\FailedDeliveries\FailedDeliveryResource;
 use SocialDept\AtpAppviewFilament\Resources\Identities\IdentityResource;
@@ -144,6 +145,36 @@ class ViewIdentity extends ViewRecord
             : Notification::make()->title('Resync queued')->body(e("Tap reports the repo as {$state}."))->success()->send();
     }
 
+    /**
+     * Run an account action, report it, and show the account as it is now.
+     *
+     * @param  \Closure(AccountActions): mixed  $run
+     */
+    protected function act(\Closure $run, string $done): void
+    {
+        try {
+            $run(app(AccountActions::class));
+        } catch (Throwable $e) {
+            Notification::make()->title('Could not do that')->body(e($e->getMessage()))->danger()->send();
+
+            return;
+        }
+
+        Notification::make()->title(e($done.' '.$this->profile()->name()))->success()->send();
+        $this->record->refresh();
+        $this->profile = null;
+    }
+
+    /**
+     * Who is acting, for the moderation log: the operator's DID, or their id.
+     */
+    protected function actor(): ?string
+    {
+        $user = auth()->user();
+
+        return $user === null ? null : (string) ($user->did ?? $user->getAuthIdentifier());
+    }
+
     protected function profile(): IdentityProfile
     {
         return $this->profile ??= IdentityProfile::for($this->record);
@@ -176,54 +207,127 @@ class ViewIdentity extends ViewRecord
                     $this->record->refresh();
                     $this->profile = null;
                 }),
-            Action::make('block')
-                ->label('Block')
-                ->icon('heroicon-o-no-symbol')
+            // Everything that changes what the app does with the account.
+            ActionGroup::make([
+                ActionGroup::make([
+                    Action::make('block')
+                        ->label('Block')
+                        ->icon('heroicon-o-no-symbol')
+                        ->visible(fn () => ! collect($this->profile()->blocks)->contains(fn (Block $block) => $block->isBlanket()))
+                        ->modalHeading(fn () => 'Block '.$this->profile()->name())
+                        ->modalDescription('Keep this repo out of the index. Records already indexed stay unless purged.')
+                        ->modalWidth('lg')
+                        ->schema([
+                            TextInput::make('collection')
+                                ->placeholder('Every collection')
+                                ->helperText('An NSID, or a prefix ending in .*'),
+                            Textarea::make('note')->rows(2),
+                            Toggle::make('purge')
+                                ->label('Delete what is already indexed')
+                                ->helperText('Otherwise only new records are dropped.'),
+                        ])
+                        ->action(function (array $data) {
+                            try {
+                                $outcome = app(Blocklist::class)->block($this->record->did, $data['collection'] ?: null, $data['note'] ?: null, (bool) $data['purge']);
+                            } catch (Throwable $e) {
+                                Notification::make()->title('Could not block')->body(e($e->getMessage()))->danger()->send();
+
+                                return;
+                            }
+
+                            BlockResource::report('Blocked '.$this->profile()->name(), $outcome);
+                            $this->profile = null;
+                        }),
+                    Action::make('unblock')
+                        ->label('Unblock')
+                        ->icon('heroicon-o-x-mark')
+                        ->visible(fn () => $this->profile()->blocks !== [])
+                        ->requiresConfirmation()
+                        ->modalDescription('Remove every rule naming this repo. Its records are indexed again as they arrive, and Tap is asked to backfill it. A rule on its host still applies.')
+                        ->action(function () {
+                            foreach ($this->profile()->blocks as $block) {
+                                $outcome = app(Blocklist::class)->unblock($block->subject, $block->collection);
+                            }
+
+                            isset($outcome)
+                                ? BlockResource::report('Unblocked '.$this->profile()->name(), $outcome)
+                                : Notification::make()->title('Already unblocked')->send();
+                            $this->profile = null;
+                        }),
+                ])->dropdown(false),
+                ActionGroup::make([
+                    Action::make('ban')
+                        ->label('Ban')
+                        ->icon('heroicon-o-user-minus')
+                        ->color('danger')
+                        ->visible(fn () => ! $this->profile()->banned())
+                        ->modalHeading(fn () => 'Ban '.$this->profile()->name())
+                        ->modalDescription(fn () => 'The account cannot sign in, and everything it wrote is hidden at once and pruned after '.config('atp-appview.moderation.prune_banned_after_days', 365).' days unless you cancel the pruning. Nothing new is indexed for it while banned.')
+                        ->modalSubmitActionLabel('Ban')
+                        ->schema([Textarea::make('reason')->rows(2)->helperText('Kept in the moderation log.')])
+                        ->action(fn (array $data) => $this->act(fn ($actions) => $actions->ban($this->record->did, $data['reason'] ?: null, $this->actor()), 'Banned')),
+                    Action::make('unban')
+                        ->label('Unban')
+                        ->icon('heroicon-o-user-plus')
+                        ->visible(fn () => $this->profile()->banned())
+                        ->requiresConfirmation()
+                        ->modalDescription('The account can sign in again, what it wrote is shown again, and Tap is asked to send what it missed. Labels that ban it are lifted too, until they are applied again.')
+                        ->action(fn () => $this->act(fn ($actions) => $actions->unban($this->record->did, $this->actor()), 'Unbanned')),
+                    Action::make('review')
+                        ->label('Needs review')
+                        ->icon('heroicon-o-eye-slash')
+                        ->color('warning')
+                        ->visible(fn () => ! $this->profile()->reviewed())
+                        ->modalHeading(fn () => $this->profile()->name().' needs review')
+                        ->modalDescription('Everything the account wrote is left out of feeds, search and other discovery, and still shown on its own page and where linked. It can sign in and post as usual.')
+                        ->modalSubmitActionLabel('Mark as needs review')
+                        ->schema([Textarea::make('reason')->rows(2)->helperText('Kept in the moderation log.')])
+                        ->action(fn (array $data) => $this->act(fn ($actions) => $actions->review($this->record->did, $data['reason'] ?: null, $this->actor()), 'Marked as needs review')),
+                    Action::make('unreview')
+                        ->label('Clear needs review')
+                        ->icon('heroicon-o-eye')
+                        ->visible(fn () => $this->profile()->reviewed())
+                        ->requiresConfirmation()
+                        ->modalDescription('What the account wrote returns to discovery.')
+                        ->action(fn () => $this->act(fn ($actions) => $actions->unreview($this->record->did, $this->actor()), 'Review cleared')),
+                    Action::make('cancelPrune')
+                        ->label('Keep its records')
+                        ->icon('heroicon-o-archive-box')
+                        ->visible(fn () => $this->profile()->banned() && ! $this->profile()->pruneCancelled())
+                        ->requiresConfirmation()
+                        ->modalDescription('The records stay, hidden, for as long as the ban lasts, instead of being pruned.')
+                        ->action(fn () => $this->act(fn ($actions) => $actions->cancelPrune($this->record->did), 'Pruning cancelled')),
+                    Action::make('resumePrune')
+                        ->label('Prune its records when due')
+                        ->icon('heroicon-o-trash')
+                        ->visible(fn () => $this->profile()->banned() && $this->profile()->pruneCancelled())
+                        ->requiresConfirmation()
+                        ->action(fn () => $this->act(fn ($actions) => $actions->resumePrune($this->record->did), 'Pruning resumed')),
+                ])->dropdown(false),
+                ActionGroup::make([
+                    Action::make('takedown')
+                        ->label('Take down on its PDS')
+                        ->icon('heroicon-o-server-stack')
+                        ->color('danger')
+                        ->visible(fn () => $this->profile()->hosted && ! $this->profile()->takenDown())
+                        ->modalHeading(fn () => 'Take down '.$this->profile()->name())
+                        ->modalDescription('The account is taken down on the PDS you run: its repo stops being served to the network. This is separate from a ban, which only affects this app.')
+                        ->modalSubmitActionLabel('Take down')
+                        ->schema([Textarea::make('reason')->rows(2)->helperText('Kept in the moderation log.')])
+                        ->action(fn (array $data) => $this->act(fn ($actions) => $actions->takedown($this->record->did, $data['reason'] ?: null, $this->actor()), 'Taken down')),
+                    Action::make('restore')
+                        ->label('Restore on its PDS')
+                        ->icon('heroicon-o-arrow-uturn-left')
+                        ->visible(fn () => $this->profile()->hosted && $this->profile()->takenDown())
+                        ->requiresConfirmation()
+                        ->modalDescription('The PDS serves the account again.')
+                        ->action(fn () => $this->act(fn ($actions) => $actions->restore($this->record->did, $this->actor()), 'Restored')),
+                ])->dropdown(false),
+            ])
+                ->label('Moderate')
+                ->icon('heroicon-m-shield-exclamation')
                 ->color('danger')
-                ->outlined()
-                ->visible(fn () => ! collect($this->profile()->blocks)->contains(fn (Block $block) => $block->isBlanket()))
-                ->modalHeading(fn () => 'Block '.$this->profile()->name())
-                ->modalDescription('Keep this repo out of the index. Records already indexed stay unless purged.')
-                ->modalWidth('lg')
-                ->schema([
-                    TextInput::make('collection')
-                        ->placeholder('Every collection')
-                        ->helperText('An NSID, or a prefix ending in .*'),
-                    Textarea::make('note')->rows(2),
-                    Toggle::make('purge')
-                        ->label('Delete what is already indexed')
-                        ->helperText('Otherwise only new records are dropped.'),
-                ])
-                ->action(function (array $data) {
-                    try {
-                        $outcome = app(Blocklist::class)->block($this->record->did, $data['collection'] ?: null, $data['note'] ?: null, (bool) $data['purge']);
-                    } catch (Throwable $e) {
-                        Notification::make()->title('Could not block')->body(e($e->getMessage()))->danger()->send();
-
-                        return;
-                    }
-
-                    BlockResource::report('Blocked '.$this->profile()->name(), $outcome);
-                    $this->profile = null;
-                }),
-            Action::make('unblock')
-                ->label('Unblock')
-                ->icon('heroicon-o-x-mark')
-                ->color('danger')
-                ->outlined()
-                ->visible(fn () => $this->profile()->blocks !== [])
-                ->requiresConfirmation()
-                ->modalDescription('Remove every rule naming this repo. Its records are indexed again as they arrive, and Tap is asked to backfill it. A rule on its host still applies.')
-                ->action(function () {
-                    foreach ($this->profile()->blocks as $block) {
-                        $outcome = app(Blocklist::class)->unblock($block->subject, $block->collection);
-                    }
-
-                    isset($outcome)
-                        ? BlockResource::report('Unblocked '.$this->profile()->name(), $outcome)
-                        : Notification::make()->title('Already unblocked')->send();
-                    $this->profile = null;
-                }),
+                ->button(),
             Action::make('failures')
                 ->label(fn () => 'Retry failures ('.number_format($this->failures()).')')
                 ->icon('heroicon-o-exclamation-triangle')
