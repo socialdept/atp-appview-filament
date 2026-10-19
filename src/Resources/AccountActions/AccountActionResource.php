@@ -30,6 +30,10 @@ class AccountActionResource extends Resource
 
     protected static ?string $modelLabel = 'action';
 
+    protected static ?string $pluralModelLabel = 'moderation log';
+
+    protected static ?string $breadcrumb = 'Moderation log';
+
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-shield-check';
 
     protected static ?int $navigationSort = 6;

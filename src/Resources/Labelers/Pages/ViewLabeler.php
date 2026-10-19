@@ -28,6 +28,16 @@ class ViewLabeler extends ViewRecord
         return $profile['displayName'] ?? $profile['handle'] ?? $this->record->did;
     }
 
+    /**
+     * Labelers, then this one's name, without the trailing "View".
+     *
+     * @return array<string, string>
+     */
+    public function getBreadcrumbs(): array
+    {
+        return [LabelerResource::getUrl('index') => 'Labelers', (string) $this->getTitle()];
+    }
+
     public function content(Schema $schema): Schema
     {
         return $schema->components([
