@@ -190,6 +190,21 @@ class IdentityResource extends Resource
         Notification::make()->title('Reconciled')->body($result->summary())->success()->send();
     }
 
+    /**
+     * The identity's page in the panel, when the plugin has one, otherwise
+     * where recordLinks() sends a DID.
+     */
+    public static function linkTo(string $did, bool $known = true): string
+    {
+        try {
+            $page = $known && AtpAppviewPlugin::get()->hasIdentities();
+        } catch (Throwable) {
+            $page = false;
+        }
+
+        return $page ? self::getUrl('view', ['record' => $did]) : Links::repo($did);
+    }
+
     public static function recordsPage(): bool
     {
         try {
