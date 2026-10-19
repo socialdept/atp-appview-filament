@@ -4,6 +4,7 @@ namespace SocialDept\AtpAppviewFilament\Tests\Feature;
 
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
 use Mockery;
 use RuntimeException;
@@ -34,6 +35,7 @@ use SocialDept\AtpAppviewFilament\Resources\Records\Pages\ListRecords;
 use SocialDept\AtpAppviewFilament\Resources\Records\RecordResource;
 use SocialDept\AtpAppviewFilament\Support\Avatars;
 use SocialDept\AtpAppviewFilament\Support\Json;
+use SocialDept\AtpAppviewFilament\Support\Links;
 use SocialDept\AtpAppviewFilament\Tests\TestCase;
 use SocialDept\AtpAppviewFilament\Widgets\CollectionsTable;
 use SocialDept\AtpAppviewFilament\Widgets\IdentityRecords;
@@ -129,6 +131,44 @@ class ResourcesTest extends TestCase
             // A collection chosen on the profile.
             ->dispatch('atp-identity-collection', collection: self::LIKES)
             ->assertDontSee('first post');
+    }
+
+    public function test_an_identity_is_blocked_and_unblocked_from_its_page(): void
+    {
+        Http::fake();
+        $this->identity('did:plc:spam', ['handle' => 'spam.test']);
+        $this->record('did:plc:spam', self::POSTS, 'a', ['text' => 'buy now']);
+
+        Livewire::test(ViewIdentity::class, ['record' => 'did:plc:spam'])
+            ->assertActionVisible('block')
+            ->assertActionHidden('unblock')
+            ->callAction('block', data: ['collection' => '', 'note' => 'spam', 'purge' => true])
+            ->assertNotified()
+            ->assertSee('Blocked')
+            ->assertActionHidden('block')
+            ->assertActionVisible('unblock');
+
+        $this->assertSame('spam', Block::query()->where('subject', 'did:plc:spam')->sole()->note);
+        $this->assertSame(0, Record::query()->where('did', 'did:plc:spam')->count(), 'Purged.');
+
+        Livewire::test(ViewIdentity::class, ['record' => 'did:plc:spam'])
+            ->callAction('unblock')
+            ->assertActionVisible('block');
+
+        $this->assertSame(0, Block::query()->count());
+    }
+
+    public function test_an_identity_page_keeps_its_links_under_more(): void
+    {
+        $this->identity('did:plc:alice', ['handle' => 'alice.test', 'pds' => 'https://pds.example']);
+
+        Livewire::test(ViewIdentity::class, ['record' => 'did:plc:alice'])
+            ->assertActionVisible('reconcile')
+            ->assertActionVisible('profile')
+            ->assertActionHasUrl('open', Links::repo('did:plc:alice'))
+            ->assertActionHasUrl('pds', 'https://pds.example')
+            ->assertActionHasUrl('plc', 'https://plc.directory/did:plc:alice/log/audit')
+            ->assertActionHasUrl('records', RecordResource::getUrl('index', ['filters' => ['did' => ['value' => 'did:plc:alice']]]));
     }
 
     public function test_an_identity_without_a_display_name_is_named_by_its_handle(): void

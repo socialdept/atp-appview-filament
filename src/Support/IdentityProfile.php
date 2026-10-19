@@ -4,6 +4,8 @@ namespace SocialDept\AtpAppviewFilament\Support;
 
 use Illuminate\Support\Carbon;
 use Illuminate\Support\HtmlString;
+use SocialDept\AtpAppview\Blocklist\Blocklist;
+use SocialDept\AtpAppview\Models\Block;
 use SocialDept\AtpAppview\Models\Identity;
 use SocialDept\AtpAppview\Models\Record;
 use SocialDept\AtpAppview\Profiles\Profiles;
@@ -19,6 +21,8 @@ class IdentityProfile
     /**
      * @param  array<string, mixed>  $profile  As Profiles::for() builds it
      * @param  array<int, array{collection: string, total: int}>  $collections  Largest first
+     * @param  array<int, Block>  $blocks  Rules naming this DID
+     * @param  bool  $blockedByHost  Whether a host rule keeps the whole repo out
      */
     public function __construct(
         public readonly Identity $identity,
@@ -27,6 +31,8 @@ class IdentityProfile
         public readonly int $records,
         public readonly ?Carbon $first,
         public readonly ?Carbon $latest,
+        public readonly array $blocks = [],
+        public readonly bool $blockedByHost = false,
     ) {
     }
 
@@ -47,6 +53,8 @@ class IdentityProfile
         $first = $rows->pluck('first')->filter()->min();
         $latest = $rows->pluck('latest')->filter()->max();
 
+        $blocks = Block::query()->where('subject', $identity->did)->orderBy('collection')->get()->all();
+
         return new self(
             $identity,
             $profile,
@@ -54,6 +62,8 @@ class IdentityProfile
             (int) $rows->sum('total'),
             $first === null ? null : Carbon::parse($first, 'UTC'),
             $latest === null ? null : Carbon::parse($latest, 'UTC'),
+            $blocks,
+            ! collect($blocks)->contains(fn (Block $block) => $block->isBlanket()) && app(Blocklist::class)->blocksRepo($identity->did, $identity->pds),
         );
     }
 

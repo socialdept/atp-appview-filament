@@ -190,7 +190,7 @@ class IdentityResource extends Resource
         Notification::make()->title('Reconciled')->body($result->summary())->success()->send();
     }
 
-    protected static function recordsPage(): bool
+    public static function recordsPage(): bool
     {
         try {
             return AtpAppviewPlugin::get()->hasRecords();

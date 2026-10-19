@@ -23,6 +23,14 @@
             @if ($status)
                 <x-filament::badge :color="$status === 'deleted' ? 'danger' : 'warning'" size="sm">{{ $status }}</x-filament::badge>
             @endif
+            @foreach ($p->blocks as $block)
+                <x-filament::badge color="danger" size="sm" icon="heroicon-m-no-symbol" :tooltip="$block->note">
+                    {{ $block->isBlanket() ? 'Blocked' : 'Blocked in '.$block->collection }}
+                </x-filament::badge>
+            @endforeach
+            @if ($p->blockedByHost)
+                <x-filament::badge color="danger" size="sm" icon="heroicon-m-no-symbol">Blocked by its host</x-filament::badge>
+            @endif
         </div>
 
         <div class="atp-profile-handle atp-muted">
