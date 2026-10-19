@@ -131,7 +131,10 @@ class BlockResource extends Resource
             ]);
     }
 
-    protected static function report(string $title, BlockOutcome $outcome): void
+    /**
+     * Say what a block or unblock did, and whether Tap was told.
+     */
+    public static function report(string $title, BlockOutcome $outcome): void
     {
         $body = collect([
             $outcome->purged > 0 ? number_format($outcome->purged).' records deleted' : null,
