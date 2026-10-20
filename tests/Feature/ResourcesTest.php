@@ -3,11 +3,13 @@
 namespace SocialDept\AtpAppviewFilament\Tests\Feature;
 
 use Filament\Facades\Filament;
+use Filament\Panel;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
 use Mockery;
 use RuntimeException;
+use SocialDept\AtpAppview\Features;
 use SocialDept\AtpAppview\Index\IdentityRefresh;
 use SocialDept\AtpAppview\Index\Reconciler;
 use SocialDept\AtpAppview\Index\ReconcileResult;
@@ -49,6 +51,7 @@ use SocialDept\AtpAppviewFilament\Resources\Records\RecordResource;
 use SocialDept\AtpAppviewFilament\Support\Avatars;
 use SocialDept\AtpAppviewFilament\Support\Json;
 use SocialDept\AtpAppviewFilament\Support\Links;
+use SocialDept\AtpAppviewFilament\Support\RecordLabels;
 use SocialDept\AtpAppviewFilament\Tests\TestCase;
 use SocialDept\AtpAppviewFilament\Widgets\CollectionsTable;
 use SocialDept\AtpAppviewFilament\Widgets\IdentityRecords;
@@ -93,6 +96,23 @@ class ResourcesTest extends TestCase
 
         $this->assertSame($before, $panel->getResources(), 'Leaving every resource out adds none.');
         $this->assertFalse(AtpAppviewPlugin::make()->records(false)->hasRecords());
+    }
+
+    public function test_the_moderation_pages_follow_the_apps_moderation_feature(): void
+    {
+        config()->set('atp-appview.features', [Features::notifications(), Features::graph()]);
+        $panel = Panel::make()->id('without-moderation');
+
+        AtpAppviewPlugin::make()->register($panel);
+
+        $this->assertNotContains(LabelerResource::class, $panel->getResources());
+        $this->assertNotContains(AccountActionResource::class, $panel->getResources());
+        $this->assertContains(IdentityResource::class, $panel->getResources(), 'The rest stay.');
+        $this->assertFalse(AtpAppviewPlugin::make()->hasModeration(), 'Nor does the Moderate menu show.');
+        $this->assertFalse(RecordLabels::column()->isVisible(), 'Nor the labels column.');
+
+        config()->set('atp-appview.features', [Features::moderation()]);
+        $this->assertTrue(AtpAppviewPlugin::make()->hasModeration());
     }
 
     public function test_identities_show_avatars_looked_up_once_per_page(): void
