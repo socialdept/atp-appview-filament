@@ -7,6 +7,8 @@ use Filament\Contracts\Plugin;
 use Filament\Panel;
 use Filament\View\PanelsRenderHook;
 use Illuminate\Support\Facades\Blade;
+use SocialDept\AtpAppview\Features;
+use SocialDept\AtpAppview\Features\Moderation;
 use SocialDept\AtpAppviewFilament\Resources\AccountActions\AccountActionResource;
 use SocialDept\AtpAppviewFilament\Resources\Blocks\BlockResource;
 use SocialDept\AtpAppviewFilament\Resources\FailedDeliveries\FailedDeliveryResource;
@@ -185,9 +187,22 @@ class AtpAppviewPlugin implements Plugin
         return $this;
     }
 
+    /**
+     * Whether the moderation pages and menus show: asked for here, and the
+     * app's moderation feature on.
+     */
     public function hasModeration(): bool
     {
-        return $this->moderation;
+        return $this->moderation && Features::enabled(Moderation::class);
+    }
+
+    /**
+     * Whether the Labelers page shows: asked for here, and the app's
+     * moderation feature on.
+     */
+    public function hasLabelers(): bool
+    {
+        return $this->labelers && Features::enabled(Moderation::class);
     }
 
     public function hasIdentities(): bool
@@ -225,8 +240,8 @@ class AtpAppviewPlugin implements Plugin
             LexiconResource::class => $this->lexicons,
             BlockResource::class => $this->blocklist,
             FailedDeliveryResource::class => $this->failedDeliveries,
-            LabelerResource::class => $this->labelers,
-            AccountActionResource::class => $this->moderation,
+            LabelerResource::class => $this->hasLabelers(),
+            AccountActionResource::class => $this->hasModeration(),
         ])));
 
         if ($this->dashboardWidgets) {

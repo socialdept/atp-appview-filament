@@ -5,6 +5,8 @@ namespace SocialDept\AtpAppviewFilament\Support;
 use Closure;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Contracts\HasTable;
+use SocialDept\AtpAppview\Features;
+use SocialDept\AtpAppview\Features\Moderation;
 use SocialDept\AtpAppview\Models\Label;
 use SocialDept\AtpAppview\Models\Record;
 
@@ -50,6 +52,8 @@ class RecordLabels
 
                 return $label === null ? 'gray' : LabelBadges::color(LabelBadges::effect($label));
             })
-            ->placeholder('');
+            ->placeholder('')
+            // Labels are the app's moderation feature, so the column goes with it.
+            ->visible(fn () => Features::enabled(Moderation::class));
     }
 }
