@@ -81,6 +81,8 @@ AtpAppviewPlugin::make()
     ->recordLinks(fn (string $uri) => "https://pdsls.dev/{$uri}")
 ```
 
+The Labelers page, the Moderation log, the Moderate menu and the records' labels column follow atp-appview's moderation feature as well: when the app leaves `Features::moderation()` out of `atp-appview.features`, they do not show, whatever the options say.
+
 AT-URIs and DIDs link to [pds.ls](https://pds.ls) unless `recordLinks()` says otherwise. The pages sit under `/appview/` in the panel's URL space.
 
 The plugin's styles are built on Filament's color variables, so they follow the panel's colors and dark mode without a custom theme.

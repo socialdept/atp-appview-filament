@@ -25,6 +25,7 @@ use SocialDept\AtpAppview\Models\Block;
 use SocialDept\AtpAppview\Models\FailedDelivery;
 use SocialDept\AtpAppview\Models\Identity;
 use SocialDept\AtpAppview\Moderation\AccountActions;
+use SocialDept\AtpAppviewFilament\AtpAppviewPlugin;
 use SocialDept\AtpAppviewFilament\Resources\Blocks\BlockResource;
 use SocialDept\AtpAppviewFilament\Resources\FailedDeliveries\FailedDeliveryResource;
 use SocialDept\AtpAppviewFilament\Resources\Identities\IdentityResource;
@@ -303,7 +304,7 @@ class ViewIdentity extends ViewRecord
                         ->visible(fn () => $this->profile()->banned() && $this->profile()->pruneCancelled())
                         ->requiresConfirmation()
                         ->action(fn () => $this->act(fn ($actions) => $actions->resumePrune($this->record->did), 'Pruning resumed')),
-                ])->dropdown(false),
+                ])->dropdown(false)->visible(fn () => AtpAppviewPlugin::get()->hasModeration()),
                 ActionGroup::make([
                     Action::make('takedown')
                         ->label('Take down on its PDS')
@@ -322,7 +323,7 @@ class ViewIdentity extends ViewRecord
                         ->requiresConfirmation()
                         ->modalDescription('The PDS serves the account again.')
                         ->action(fn () => $this->act(fn ($actions) => $actions->restore($this->record->did, $this->actor()), 'Restored')),
-                ])->dropdown(false),
+                ])->dropdown(false)->visible(fn () => AtpAppviewPlugin::get()->hasModeration()),
             ])
                 ->label('Moderate')
                 ->icon('heroicon-m-shield-exclamation')
