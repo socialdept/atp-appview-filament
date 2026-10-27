@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
 use SocialDept\AtpAppview\Index\IndexStats;
+use SocialDept\AtpAppview\Ingest\Heartbeats;
 use SocialDept\AtpAppview\Models\Identity;
 use SocialDept\AtpAppviewFilament\Tests\TestCase;
 use SocialDept\AtpAppviewFilament\Widgets\BackfillsWidget;
@@ -57,6 +58,53 @@ class DashboardStatsTest extends TestCase
         Http::fake(['*' => Http::response('down', 503)]);
 
         Livewire::test(NetworkOverview::class)->assertSee('Unreachable')->assertDontSee('Repos followed');
+    }
+
+    public function test_network_reports_jetstream_in_place_of_tap(): void
+    {
+        config(['atp-appview.ingest.source' => 'jetstream']);
+        Http::fake(['*' => Http::response('down', 503)]);
+        app(Heartbeats::class)->beat('jetstream');
+        DB::table('atp_ingest_cursors')->insert(['source' => 'jetstream', 'cursor' => 812, 'updated_at' => now('UTC')]);
+        Identity::query()->insert(['did' => 'did:plc:alice', 'active' => true, 'updated_at' => now()]);
+
+        Livewire::test(NetworkOverview::class)
+            ->assertSee('Following')
+            ->assertSee('Cursor saved')
+            ->assertSee('Repos followed')
+            ->assertDontSee('Tap')
+            ->assertDontSee('Unreachable');
+    }
+
+    public function test_network_says_when_a_jetstream_cursor_stops_moving(): void
+    {
+        config(['atp-appview.ingest.source' => 'jetstream']);
+        app(Heartbeats::class)->beat('jetstream');
+        DB::table('atp_ingest_cursors')->insert(['source' => 'jetstream', 'cursor' => 812, 'updated_at' => now('UTC')->subMinutes(5)]);
+
+        Livewire::test(NetworkOverview::class)->assertSee('Stalled');
+    }
+
+    public function test_network_says_when_jetstream_is_not_running(): void
+    {
+        config(['atp-appview.ingest.source' => 'jetstream']);
+
+        Livewire::test(NetworkOverview::class)
+            ->assertSee('Not running')
+            ->assertSee('appview:jetstream')
+            ->assertDontSee('Repos followed');
+    }
+
+    public function test_network_reports_the_label_streams(): void
+    {
+        config(['atp-appview.ingest.source' => 'jetstream', 'atp-appview.labels.source' => 'streams']);
+        app(Heartbeats::class)->beat('jetstream');
+        app(Heartbeats::class)->beat('labels', ['following' => 3]);
+
+        Livewire::test(NetworkOverview::class)
+            ->assertSee('Label streams')
+            ->assertSee('3 open')
+            ->assertSee('Last label never');
     }
 
     public function test_index_reports_what_it_holds(): void
