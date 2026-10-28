@@ -16,6 +16,7 @@ use SocialDept\AtpAppview\Index\ReconcileResult;
 use SocialDept\AtpAppview\Ingest\Events\RecordAction;
 use SocialDept\AtpAppview\Ingest\Events\RecordEvent;
 use SocialDept\AtpAppview\Ingest\FailedDeliveries;
+use SocialDept\AtpAppview\Ingest\Heartbeats;
 use SocialDept\AtpAppview\Ingest\Rejections;
 use SocialDept\AtpAppview\Ingest\Repairs;
 use SocialDept\AtpAppview\Ingest\TapAdmin;
@@ -32,6 +33,7 @@ use SocialDept\AtpAppview\Models\Labeler;
 use SocialDept\AtpAppview\Models\LabelPolicy;
 use SocialDept\AtpAppview\Models\Record;
 use SocialDept\AtpAppview\Profiles\Profiles;
+use SocialDept\AtpAppview\Status\AppviewStatus;
 use SocialDept\AtpAppviewFilament\AtpAppviewPlugin;
 use SocialDept\AtpAppviewFilament\Resources\AccountActions\AccountActionResource;
 use SocialDept\AtpAppviewFilament\Resources\AccountActions\Pages\ListAccountActions as AccountActionsListPage;
@@ -354,6 +356,26 @@ class ResourcesTest extends TestCase
         $this->assertSame(Effect::Hide, app(Labels::class)->effect('did:plc:mod', 'rude', Target::CONTENT));
 
         Livewire::test(AccountActionsListPage::class)->assertOk();
+    }
+
+    public function test_labelers_followed_by_their_own_streams_show_the_stream_in_place_of_tack(): void
+    {
+        config(['atp-appview.labels.source' => 'streams']);
+        Labeler::query()->create(['did' => 'did:plc:mod', 'endpoint' => 'https://mod.example']);
+
+        Livewire::test(ListLabelers::class)
+            ->assertSee('stopped')
+            ->assertSee('Last label')
+            ->assertDontSee('no tack')
+            ->assertTableActionVisible('follow');
+
+        app(Heartbeats::class)->beat('labels', ['following' => 1]);
+        DB::table('atp_ingest_cursors')->insert(['source' => 'labels:did:plc:mod', 'cursor' => 5, 'updated_at' => now('UTC')->subMinutes(3)]);
+        app(AppviewStatus::class)->forget();
+
+        Livewire::test(ListLabelers::class)
+            ->assertSee('streaming')
+            ->assertSee('3m ago');
     }
 
     public function test_an_identity_without_a_display_name_is_named_by_its_handle(): void
