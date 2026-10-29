@@ -79,11 +79,30 @@ AtpAppviewPlugin::make()
                                    // failedDeliveries(), labelers()
                                    // and moderation()
     ->recordLinks(fn (string $uri) => "https://pdsls.dev/{$uri}")
+    ->signOutUrl('/sign-out')      // frontend mode, see Signing out
+    ->signOut(false)               // logout ends the Laravel session only
 ```
 
 The Labelers page, the Moderation log, the Moderate menu and the records' labels column follow atp-appview's moderation feature as well: when the app leaves `Features::moderation()` out of `atp-appview.features`, they do not show, whatever the options say.
 
 AT-URIs and DIDs link to [pds.ls](https://pds.ls) unless `recordLinks()` says otherwise. The pages sit under `/appview/` in the panel's URL space.
+
+## Signing out
+
+Filament's logout ends the Laravel session only, which leaves the user's atproto session behind. On a panel with the plugin, logout ends that too, the way atp-appview's `auth.mode` says it is held:
+
+- **Backend mode**: the server holds the OAuth session, so logout forgets it through atp-client's credential provider before ending the Laravel session. The user model implements `HasAtpSession` to name the DID.
+- **Frontend mode**: the browser holds the session, and only the browser can drop it. Set `signOutUrl()` to a page in your app, open to guests, that calls `signOut()` from atp-appview's browser library, and logout sends the browser there once the Laravel session has ended. Call `signOut()` before anything runs `reconcile()` or `syncSessions()` on that page, or the browser starts a new server session from the tokens it still holds. Without `signOutUrl()`, logout ends the Laravel session as Filament does, and the next page that reconciles signs the browser back in.
+
+```ts
+// resources/js/pages/SignOut.vue, served at /sign-out
+import { signOut } from '@socialdept/atp-appview';
+
+await signOut();
+window.location.assign('/');
+```
+
+`signOut(false)` restores Filament's own logout. Panels without the plugin are left alone.
 
 The plugin's styles are built on Filament's color variables, so they follow the panel's colors and dark mode without a custom theme.
 

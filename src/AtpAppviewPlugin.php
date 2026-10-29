@@ -49,6 +49,10 @@ class AtpAppviewPlugin implements Plugin
 
     protected bool $moderation = true;
 
+    protected bool $signOut = true;
+
+    protected string|Closure|null $signOutUrl = null;
+
     /** @var (Closure(string): string)|null */
     protected ?Closure $recordLinks = null;
 
@@ -213,6 +217,42 @@ class AtpAppviewPlugin implements Plugin
     public function hasRecords(): bool
     {
         return $this->records;
+    }
+
+    /**
+     * Whether the panel's logout ends the atproto session too: in backend
+     * mode the server forgets the OAuth session it holds, and in frontend
+     * mode the browser goes to signOutUrl() to drop its own.
+     */
+    public function signOut(bool $condition = true): static
+    {
+        $this->signOut = $condition;
+
+        return $this;
+    }
+
+    public function hasSignOut(): bool
+    {
+        return $this->signOut;
+    }
+
+    /**
+     * In frontend mode, the app page the panel's logout sends the browser to.
+     * The page calls signOut() from atp-appview's browser library before
+     * anything reconciles the sessions, or the browser signs straight back in.
+     */
+    public function signOutUrl(string|Closure|null $url): static
+    {
+        $this->signOutUrl = $url;
+
+        return $this;
+    }
+
+    public function getSignOutUrl(): ?string
+    {
+        $url = $this->signOutUrl instanceof Closure ? ($this->signOutUrl)() : $this->signOutUrl;
+
+        return is_string($url) && $url !== '' ? $url : null;
     }
 
     /**
