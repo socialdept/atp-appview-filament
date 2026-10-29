@@ -220,9 +220,10 @@ class AtpAppviewPlugin implements Plugin
     }
 
     /**
-     * Whether the panel's logout ends the atproto session too: in backend
-     * mode the server forgets the OAuth session it holds, and in frontend
-     * mode the browser goes to signOutUrl() to drop its own.
+     * Whether the panel's logout ends the atproto session too, through
+     * atp-appview's SignOut: in backend mode the server revokes the OAuth
+     * session it holds, and in frontend mode the browser goes to
+     * signOutUrl(), where atp-appview's browser library drops its own.
      */
     public function signOut(bool $condition = true): static
     {
@@ -237,9 +238,9 @@ class AtpAppviewPlugin implements Plugin
     }
 
     /**
-     * In frontend mode, the app page the panel's logout sends the browser to.
-     * The page calls signOut() from atp-appview's browser library before
-     * anything reconciles the sessions, or the browser signs straight back in.
+     * In frontend mode, the app page the panel's logout sends the browser to,
+     * `/` by default. Any page that runs atp-appview's browser library will
+     * do: it sees the sign-out SignOut flashed and signs the browser out.
      */
     public function signOutUrl(string|Closure|null $url): static
     {

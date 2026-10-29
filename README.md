@@ -79,7 +79,7 @@ AtpAppviewPlugin::make()
                                    // failedDeliveries(), labelers()
                                    // and moderation()
     ->recordLinks(fn (string $uri) => "https://pdsls.dev/{$uri}")
-    ->signOutUrl('/sign-out')      // frontend mode, see Signing out
+    ->signOutUrl('/home')          // frontend mode, see Signing out
     ->signOut(false)               // logout ends the Laravel session only
 ```
 
@@ -89,18 +89,10 @@ AT-URIs and DIDs link to [pds.ls](https://pds.ls) unless `recordLinks()` says ot
 
 ## Signing out
 
-Filament's logout ends the Laravel session only, which leaves the user's atproto session behind. On a panel with the plugin, logout ends that too, the way atp-appview's `auth.mode` says it is held:
+Filament's logout ends the Laravel session only, which leaves the user's atproto session behind. On a panel with the plugin, logout goes through atp-appview's `SignOut` instead, which ends both, the way atp-appview's `auth.mode` says the session is held:
 
-- **Backend mode**: the server holds the OAuth session, so logout forgets it through atp-client's credential provider before ending the Laravel session. The user model implements `HasAtpSession` to name the DID.
-- **Frontend mode**: the browser holds the session, and only the browser can drop it. Set `signOutUrl()` to a page in your app, open to guests, that calls `signOut()` from atp-appview's browser library, and logout sends the browser there once the Laravel session has ended. Call `signOut()` before anything runs `reconcile()` or `syncSessions()` on that page, or the browser starts a new server session from the tokens it still holds. Without `signOutUrl()`, logout ends the Laravel session as Filament does, and the next page that reconciles signs the browser back in.
-
-```ts
-// resources/js/pages/SignOut.vue, served at /sign-out
-import { signOut } from '@socialdept/atp-appview';
-
-await signOut();
-window.location.assign('/');
-```
+- **Backend mode**: the server holds the OAuth session, so logout revokes it at the authorization server through atp-client and forgets it. The user model implements `HasAtpSession`, or has the DID in atp-appview's `auth.did_column`. A failed revocation is logged, and logout still goes ahead.
+- **Frontend mode**: the browser holds the session, and only the browser can drop it. Logout ends the Laravel session and sends the browser to `signOutUrl()`, `/` unless set. Any app page that runs atp-appview's browser library will do: the page's `browserConfig()` carries the sign-out, and the library signs the browser out instead of starting a new server session. Panels do not run the library, so the page must be one of the app's own.
 
 `signOut(false)` restores Filament's own logout. Panels without the plugin are left alone.
 
