@@ -4,12 +4,12 @@ namespace SocialDept\AtpAppviewFilament\Tests\Feature;
 
 use Filament\Facades\Filament;
 use Illuminate\Testing\TestResponse;
-use Mockery;
-use RuntimeException;
+use SocialDept\AtpAppview\Auth\SignOut;
 use SocialDept\AtpAppviewFilament\AtpAppviewPlugin;
 use SocialDept\AtpAppviewFilament\Tests\Fixtures\AtpUser;
 use SocialDept\AtpAppviewFilament\Tests\TestCase;
-use SocialDept\AtpClient\Contracts\CredentialProvider;
+use SocialDept\AtpClient\Facades\Atp;
+use SocialDept\AtpClient\Testing\FakeAtpManager;
 
 class LogoutTest extends TestCase
 {
@@ -20,38 +20,39 @@ class LogoutTest extends TestCase
         $app['config']->set('auth.providers.users.model', AtpUser::class);
     }
 
-    public function test_backend_mode_forgets_the_server_held_session(): void
+    public function test_backend_mode_revokes_the_server_held_session(): void
     {
         config()->set('atp-appview.auth.mode', 'backend');
-
-        $credentials = Mockery::mock(CredentialProvider::class);
-        $credentials->shouldReceive('removeCredentials')->once()->with('did:plc:alice');
-        $this->app->instance(CredentialProvider::class, $credentials);
+        $atp = Atp::fake();
 
         $this->logout()->assertRedirect(Filament::getUrl());
 
+        $this->assertSame([['revoke', ['did' => 'did:plc:alice']]], $this->revoked($atp));
         $this->assertGuest();
     }
 
-    public function test_frontend_mode_sends_the_browser_to_sign_itself_out(): void
+    public function test_frontend_mode_sends_the_browser_to_a_page_that_signs_it_out(): void
     {
         config()->set('atp-appview.auth.mode', 'frontend');
-        AtpAppviewPlugin::get()->signOutUrl(fn () => url('/sign-out'));
+        AtpAppviewPlugin::get()->signOutUrl(fn () => url('/home'));
+        $atp = Atp::fake();
 
-        $credentials = Mockery::mock(CredentialProvider::class);
-        $credentials->shouldNotReceive('removeCredentials');
-        $this->app->instance(CredentialProvider::class, $credentials);
+        $this->logout()
+            ->assertRedirect(url('/home'))
+            ->assertSessionHas(SignOut::FLASH_KEY);
 
-        $this->logout()->assertRedirect(url('/sign-out'));
-
+        $this->assertSame([], $this->revoked($atp), 'The browser holds the session, so the server revokes nothing.');
         $this->assertGuest();
     }
 
-    public function test_frontend_mode_without_a_sign_out_page_logs_out_as_filament_does(): void
+    public function test_frontend_mode_sends_the_browser_home_by_default(): void
     {
         config()->set('atp-appview.auth.mode', 'frontend');
+        Atp::fake();
 
-        $this->logout()->assertRedirect(Filament::getUrl());
+        $this->logout()
+            ->assertRedirect(url('/'))
+            ->assertSessionHas(SignOut::FLASH_KEY);
 
         $this->assertGuest();
     }
@@ -59,28 +60,23 @@ class LogoutTest extends TestCase
     public function test_sign_out_can_be_turned_off(): void
     {
         config()->set('atp-appview.auth.mode', 'backend');
-        AtpAppviewPlugin::get()->signOut(false)->signOutUrl('/sign-out');
+        AtpAppviewPlugin::get()->signOut(false)->signOutUrl('/home');
+        $atp = Atp::fake();
 
-        $credentials = Mockery::mock(CredentialProvider::class);
-        $credentials->shouldNotReceive('removeCredentials');
-        $this->app->instance(CredentialProvider::class, $credentials);
+        $this->logout()
+            ->assertRedirect(Filament::getUrl())
+            ->assertSessionMissing(SignOut::FLASH_KEY);
 
-        $this->logout()->assertRedirect(Filament::getUrl());
-
+        $this->assertSame([], $this->revoked($atp));
         $this->assertGuest();
     }
 
-    public function test_a_failing_credential_store_still_logs_out(): void
+    /**
+     * @return array<int, array{0: string, 1: array<string, mixed>}>
+     */
+    protected function revoked(FakeAtpManager $atp): array
     {
-        config()->set('atp-appview.auth.mode', 'backend');
-
-        $credentials = Mockery::mock(CredentialProvider::class);
-        $credentials->shouldReceive('removeCredentials')->andThrow(new RuntimeException('Store is down'));
-        $this->app->instance(CredentialProvider::class, $credentials);
-
-        $this->logout()->assertRedirect(Filament::getUrl());
-
-        $this->assertGuest();
+        return array_values(array_filter($atp->oauth()->recordedCalls(), fn (array $call) => $call[0] === 'revoke'));
     }
 
     protected function logout(): TestResponse
