@@ -132,6 +132,23 @@ class ResourcesTest extends TestCase
             ->assertSeeHtml(Avatars::placeholder('bob.test'));
     }
 
+    public function test_moderated_accounts_are_named_without_a_lookup_per_row(): void
+    {
+        $this->identity('did:plc:alice', ['handle' => 'alice.test']);
+
+        foreach (['did:plc:alice', 'did:plc:bob', 'did:plc:carol'] as $did) {
+            AccountAction::query()->create(['did' => $did, 'action' => AccountAction::BAN, 'source' => AccountAction::MANUAL, 'created_at' => now()]);
+        }
+
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+        Livewire::test(AccountActionsListPage::class)->assertSee('@alice.test')->assertSee('did:plc:bob');
+        $lookups = array_filter(array_column(DB::getQueryLog(), 'query'), fn (string $sql) => str_contains($sql, 'atp_identities'));
+        DB::disableQueryLog();
+
+        $this->assertCount(1, $lookups, 'The page reads every account with its rows.');
+    }
+
     public function test_an_identity_page_is_laid_out_as_its_profile_with_its_records(): void
     {
         $this->identity('did:plc:alice', ['handle' => 'alice.test', 'pds' => 'https://pds.example']);
