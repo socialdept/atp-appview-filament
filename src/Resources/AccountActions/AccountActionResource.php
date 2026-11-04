@@ -46,12 +46,17 @@ class AccountActionResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
+            // Each row's account, read with the page rather than twice per row.
+            ->modifyQueryUsing(fn (Builder $query) => $query->select($query->getModel()->qualifyColumn('*'))->addSelect([
+                'identity_handle' => Identity::query()->select('handle')->whereColumn('did', $query->getModel()->qualifyColumn('did')),
+                'identity_known' => Identity::query()->selectRaw('1')->whereColumn('did', $query->getModel()->qualifyColumn('did')),
+            ]))
             ->columns([
                 TextColumn::make('did')
                     ->label('Account')
-                    ->state(fn (AccountAction $record) => ($handle = Identity::query()->whereKey($record->did)->value('handle')) ? '@'.$handle : $record->did)
+                    ->state(fn (AccountAction $record) => $record->identity_handle ? '@'.$record->identity_handle : $record->did)
                     ->description(fn (AccountAction $record) => $record->did)
-                    ->url(fn (AccountAction $record) => IdentityResource::linkTo($record->did, Identity::query()->whereKey($record->did)->exists()))
+                    ->url(fn (AccountAction $record) => IdentityResource::linkTo($record->did, $record->identity_known !== null))
                     ->searchable(['did'])
                     ->weight('medium'),
                 TextColumn::make('action')
