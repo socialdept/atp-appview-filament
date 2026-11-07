@@ -19,7 +19,7 @@ When requesting or submitting new features, first consider whether it might be u
 ### Before Filing an Issue
 
 - Search existing issues to avoid duplicates
-- Check the [documentation](README.md) to ensure it's not a usage question
+- Check the [documentation](docs/introduction.md) to ensure it's not a usage question
 - Provide a clear title and description
 - Include steps to reproduce the issue
 - Specify your environment (PHP version, Laravel version, package version)
@@ -47,38 +47,21 @@ When requesting or submitting new features, first consider whether it might be u
 
 ## How Changes Land
 
-`main` is protected. Every change arrives by pull request; direct pushes are
+`main` is protected. Every change arrives by pull request, and direct pushes are
 blocked.
 
 - **Merges are squash-only, and the PR title becomes the permanent commit
   message on `main`.** Write it as one descriptive line. Individual commit
   messages are preserved in the body.
-- **Both checks must pass** — `Tests (PHP 8.4 - Laravel 13)` and `php-cs-fixer`
-  — and your branch must be up to date with `main` before merging.
+- **Both checks must pass:** `Tests (PHP 8.4 - Laravel 13)` and `php-cs-fixer`.
+  Your branch must also be up to date with `main` before merging.
 - No approval is required, but review threads must be resolved.
 
 ## Running Tests
 
 ```bash
-vendor/bin/phpunit --exclude-group integration
+vendor/bin/phpunit
 ```
-
-The `integration` group reaches the GitHub API to check the vendored lexicons
-against upstream. It is excluded in CI and run deliberately:
-
-```bash
-vendor/bin/phpunit --group integration
-```
-
-A failure there is not a bug in this package — it means upstream moved and the
-lexicons need re-pinning.
-
-## Vendored Lexicons
-
-`lexicons/` holds the `com.atproto.space.*` and `com.atproto.simplespace.*`
-definitions byte-for-byte from upstream, pinned by `lexicons/MANIFEST.json`.
-**Do not edit them by hand.** Re-vendor from the pinned repository and update the
-manifest in the same pull request.
 
 ## Code Style
 
